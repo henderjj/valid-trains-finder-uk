@@ -23,35 +23,41 @@ const optionKey = (f: FareOption) => `${f.ticket}/${f.route}`;
 const optionLabel = (f: FareOption) =>
   `${f.type.name} · ${price(f.pence)}${f.route === '00000' ? '' : ` · ${f.routeName}`}`;
 
-// The last ticket picked, so a new search offers the same kind of ticket again.
+// The last ticket picked and whether only direct trains were wanted, so a new search
+// starts the same way.
 let lastTicket = '';
+let lastDirectOnly = false;
 
 export function Results({ from, to, date, journeys, fares, stations }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const [leg, setLeg] = useState<Leg>('O');
   const [picked, setPicked] = useState(lastTicket);
   const [validOnly, setValidOnly] = useState(true);
+  const [directOnly, setDirectOnly] = useState(lastDirectOnly);
   const names = useMemo(() => new Map(stations.map((s) => [s.crs, s.name])), [stations]);
   const name = (crs: string) => names.get(crs) ?? crs;
 
   const options = fares ? (leg === 'O' ? fares.out : fares.back) : [];
   const ticket = options.find((f) => optionKey(f) === picked) ?? options.find((f) => f.ticket === picked.split('/')[0]);
 
+  const pool = useMemo(() => (directOnly ? journeys.filter((j) => j.legs.length === 1) : journeys), [journeys, directOnly]);
+
   const validity = useMemo(() => {
     const map = new Map<Journey, Validity>();
     if (!ticket || !fares) return map;
     const set = restrictionSetFor(fares.sets, date);
-    for (const j of journeys) map.set(j, fareValidity(j, ticket, set, date, leg, name, fares.routeing ?? undefined));
+    for (const j of pool) map.set(j, fareValidity(j, ticket, set, date, leg, name, fares.routeing ?? undefined));
     return map;
-  }, [ticket, fares, journeys, date, leg, names]);
+  }, [ticket, fares, pool, date, leg, names]);
 
   const validCount = [...validity.values()].filter((v) => v.valid).length;
-  const shown = ticket && validOnly ? journeys.filter((j) => validity.get(j)?.valid) : journeys;
+  const shown = ticket && validOnly ? pool.filter((j) => validity.get(j)?.valid) : pool;
   const restriction = ticket?.restriction ? restrictionSetFor(fares?.sets ?? [], date)?.restrictions[ticket.restriction] : undefined;
   const restrictionText = restriction && (leg === 'O' ? restriction.out : restriction.rtn || restriction.out);
 
-  const count = `${journeys.length} ${journeys.length === 1 ? 'journey' : 'journeys'}`;
-  const summary = !journeys.length ? 'No journeys found' : ticket ? `${validCount} of ${count} valid` : count;
+  const kind = directOnly ? 'direct ' : '';
+  const count = `${pool.length} ${kind}${pool.length === 1 ? 'journey' : 'journeys'}`;
+  const summary = !pool.length ? `No ${kind}journeys found` : ticket ? `${validCount} of ${count} valid` : count;
 
   return (
     <section class="results" aria-live="polite">
@@ -104,8 +110,23 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
         </div>
       )}
 
+      {journeys.length > 0 && (
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={directOnly}
+            onChange={(e) => {
+              lastDirectOnly = (e.currentTarget as HTMLInputElement).checked;
+              setDirectOnly(lastDirectOnly);
+            }}
+          />
+          Direct trains only
+        </label>
+      )}
+
       {journeys.length === 0 && <p>No journeys with up to two changes were found on this day.</p>}
-      {journeys.length > 0 && shown.length === 0 && (
+      {journeys.length > 0 && pool.length === 0 && <p>There are no direct trains on this day. Untick "Direct trains only" to see journeys with changes.</p>}
+      {pool.length > 0 && shown.length === 0 && (
         <p>None of these journeys are valid with this ticket. Untick "Show valid trains only" to see them all.</p>
       )}
       <ol class="journeys">

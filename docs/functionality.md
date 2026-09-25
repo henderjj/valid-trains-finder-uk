@@ -49,6 +49,8 @@ The app lists every journey that leaves the origin on the chosen date (00:00 to 
 
 Tap a journey to expand it. The expanded view shows each train's operator and its calls with times, and "Change at X, N min to change" between trains.
 
+Tick **Direct trains only** to hide journeys with changes. It is off by default, and the app remembers your choice for later searches until the page is reloaded. The summary line then counts direct journeys only ("2 direct journeys"). If there are no direct trains that day, the app says so and suggests unticking the option.
+
 ### How journeys are found
 
 - **Every direct train** between the two stations is listed.
