@@ -58,6 +58,15 @@ describe('planJourneys', () => {
     expect(journeys[0].legs[1].calls.map((c) => c.crs)).toEqual(['DBY', 'SHF']);
   });
 
+  it("uses a station's own minimum connection time", () => {
+    // With 2 minutes at Derby, A (06:15) connects into D (06:18) and reaches Sheffield at 06:50.
+    const quick = planJourneys(net, day, 'LGE', 'SHF', { changeTimes: { DBY: 2 } });
+    expect(quick[0]).toMatchObject({ dep: hm('06:00'), arr: hm('06:50') });
+    // With 12 minutes at Derby, A no longer connects into B (06:25).
+    const slow = planJourneys(net, day, 'LGE', 'SHF', { changeTimes: { DBY: 12 } });
+    expect(slow.map(describeJourney)).not.toContain('A LGE-DBY, B DBY-SHF');
+  });
+
   it('respects the most trains allowed', () => {
     expect(planJourneys(net, day, 'LGE', 'SHF', { maxLegs: 2 }).map(describeJourney)).not.toContain('H LGE-NOT, I NOT-DBY, J DBY-SHF');
   });

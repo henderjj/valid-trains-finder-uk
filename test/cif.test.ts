@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseCif, schedulesForDate, toConnections } from '../pipeline/cif.ts';
+import { parseChangeTimes, parseCif, schedulesForDate, toConnections } from '../pipeline/cif.ts';
 
 const cif = parseCif(readFileSync(new URL('./fixtures/sample.MCA', import.meta.url), 'utf8'));
 
@@ -46,5 +46,19 @@ describe('toConnections', () => {
       { from: 'LGEATON', to: 'CHFD', dep: 1370, arr: 1410, uid: 'C12345' },
       { from: 'CHFD', to: 'SHEFFLD', dep: 1411, arr: 1450, uid: 'C12345' },
     ]);
+  });
+});
+
+describe('parseChangeTimes', () => {
+  it('reads minimum connection times by CRS, from the first record for each station', () => {
+    const lines = [
+      '/!! Start of file',
+      'A                             FILE-SPEC=05 1.00 22/09/26 18.08.01   969',
+      'A    DERBY                         2DRBY   DBY   DBY14362 63356 6',
+      'A    CLAPHAM JUNCTION              9CLPHMJ1CLJ   CLJ15272 6175510',
+      'A    CLAPHAM JUNCTION              2CLPHMJCCLJ   CLJ15272 6175505',
+      'L    DERBY                         DERBY',
+    ];
+    expect(parseChangeTimes(lines)).toEqual(new Map([['DBY', 6], ['CLJ', 10]]));
   });
 });

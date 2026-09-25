@@ -2,7 +2,7 @@
 // from the built data in public/data/. A quick way to check results against known cases.
 // Usage: npm run data:check -- FROM TO [date YYYY-MM-DD, default the first built day]
 import { existsSync, readFileSync } from 'node:fs';
-import { fareValidity, faresBetween, restrictionSetFor, type FareFile, type FaresMeta, type RestrictionSet } from '../src/lib/fares.ts';
+import { describeTicketRules, fareValidity, faresBetween, restrictionSetFor, type FareFile, type FaresMeta, type RestrictionSet } from '../src/lib/fares.ts';
 import { buildNetwork, planJourneys } from '../src/lib/planner.ts';
 import { Routeing, type PermittedRoutes, type RouteingData } from '../src/lib/routeing.ts';
 import { clock, type DataMeta, type DayFile, type Station } from '../src/lib/timetable.ts';
@@ -15,7 +15,9 @@ if (!from || !to) throw new Error('Usage: data:check -- FROM TO [date]');
 const date = dateArg || read<DataMeta>('meta.json').from;
 const meta = read<FaresMeta>('fares-meta.json');
 const sets = read<RestrictionSet[]>('restrictions.json');
-const names = new Map(read<Station[]>('stations.json').map((s) => [s.crs, s.name]));
+const stations = read<Station[]>('stations.json');
+const names = new Map(stations.map((s) => [s.crs, s.name]));
+const changeTimes = Object.fromEntries(stations.flatMap((s) => (s.change === undefined ? [] : [[s.crs, s.change]])));
 const name = (crs: string) => names.get(crs) ?? crs;
 const files = new Map<string, FareFile>();
 for (const code of meta.locations[from] ?? []) {
@@ -26,7 +28,14 @@ const day = read<DayFile>(`days/${date}.json`);
 const started = performance.now();
 const net = buildNetwork(day);
 const built = performance.now();
-const journeys = planJourneys(net, day, from, to);
+const journeys = planJourneys(net, day, from, to, { changeTimes });
+const flat = planJourneys(net, day, from, to).length;
+console.log(`Change times: ${name(from)} ${changeTimes[from] ?? '-'} min, ${name(to)} ${changeTimes[to] ?? '-'} min; ${journeys.length} journeys (${flat} with 5 minutes everywhere)`);
+for (const j of journeys.filter((j) => j.legs.length > 1).slice(0, 5)) {
+  const changes = j.legs.slice(1).map((l, i) => `${l.calls[0].crs} ${l.dep - j.legs[i].arr} min (needs ${changeTimes[l.calls[0].crs] ?? 5})`);
+  const platforms = j.legs.map((l) => `${l.calls[0].platform ?? '?'}>${l.calls[l.calls.length - 1].platform ?? '?'}`);
+  console.log(`  ${clock(j.dep)}-${clock(j.arr)} changes ${changes.join(', ')}; platforms ${platforms.join(' ')}`);
+}
 let routeing: Routeing | undefined;
 if (existsSync(`${DATA}/routeing.json`)) {
   const data = read<RouteingData>('routeing.json');
@@ -49,6 +58,7 @@ console.log(`${name(from)} → ${name(to)} on ${date}: ${journeys.length} journe
 for (const f of faresBetween(meta, files, from, to)) {
   const r = f.restriction ? set?.restrictions[f.restriction] : undefined;
   console.log(`\n${f.ticket} ${f.type.name} £${(f.pence / 100).toFixed(2)} route ${f.route} (${f.routeName}) restriction ${f.restriction || '-'} ${r ? `"${r.desc}" ${r.out}` : ''}`);
+  console.log(`  Rules: ${describeTicketRules(f.type) || 'none in the feed'}`);
   for (const j of journeys) {
     const v = fareValidity(j, f, set, date, 'O', name, routeing);
     console.log(`  ${clock(j.dep)}-${clock(j.arr)} ${j.legs.map((l) => `${l.operator} ${l.calls[0].crs}`).join(' > ')} ${v.valid ? 'valid' : 'NOT valid'}${v.reason ? `: ${v.reason}` : ''}`);

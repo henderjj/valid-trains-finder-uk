@@ -32,7 +32,8 @@ After the first visit, the app itself works offline. Data files (timetables, far
 - **Date** defaults to today (UK time).
 - Only dates that have timetable data can be searched. This is 12 weeks (84 days) from when the data was last built. With weekly builds, that means at least 11 weeks ahead. Outside that range, the app says which dates are available.
 - Dates further ahead show the planned timetable. Engineering-work changes are usually published about 12 weeks ahead, so times may still change for the furthest dates.
-- **Find trains** is enabled once both stations are chosen, they are different, and the date is in range.
+- **Return date** is optional. Leave it empty to search one way. Set it to also find journeys back from the destination on that date (see [Return trips](#return-trips)). It must be on or after the outward date and within the same range; the **✕** button clears it.
+- **Find trains** is enabled once both stations are chosen, they are different, and the dates are in range.
 
 ### Recent routes
 
@@ -47,7 +48,7 @@ The app lists every journey that leaves the origin on the chosen date (00:00 to 
 - The train operators, plus "Bus" when any part is a replacement or scheduled bus.
 - A validity badge when a ticket is chosen (see below).
 
-Tap a journey to expand it. The expanded view shows each train's operator and its calls with times, and "Change at X, N min to change" between trains.
+Tap a journey to expand it. The expanded view shows each train's operator and its calls with times and planned platforms ("Plat 4A", where the timetable gives one), and "Change at X, N min to change" between trains. When the journey is today, each train also has a **Live times** link, which opens National Rail's live departures between the stations where you board and leave that train.
 
 Tick **Direct trains only** to hide journeys with changes. It is off by default, and the app remembers your choice for later searches until the page is reloaded. The summary line then counts direct journeys only ("2 direct journeys"). If there are no direct trains that day, the app says so and suggests unticking the option.
 
@@ -56,7 +57,7 @@ Tick **Direct trains only** to hide journeys with changes. It is off by default,
 - **Every direct train** between the two stations is listed.
 - **Journeys with changes** are found by searching the day's timetable for the earliest arrival from each departure time through the day. The search uses these limits:
   - At most **3 trains**, which means up to two changes.
-  - At least **5 minutes** to change trains.
+  - At least the station's **minimum connection time** to change trains, from the timetable's station list (for example 6 minutes at Derby, 10 at Manchester Piccadilly and 15 at London King's Cross). Stations without one use 5 minutes.
   - At most **12 hours** for the whole journey.
 - A journey with changes is left out when another journey leaves no earlier, arrives no later, and has no more changes.
 - The search runs in the background (a Web Worker), so the page stays responsive.
@@ -65,7 +66,8 @@ Current limits:
 
 - Journeys that continue past midnight into the next day's timetable are not found.
 - Very long journeys (for example Penzance to Inverness) may find nothing, because of the 3-train and 12-hour limits.
-- The change time is 5 minutes everywhere. It does not use each station's own minimum connection time.
+- The few operator-specific connection times some stations publish (for example between two Southern trains at Clapham Junction) are not used; the station's general time applies.
+- Walking or Underground links between separate stations (for example across London) are not used, so a journey never changes between two different stations.
 
 ## Tickets
 
@@ -73,7 +75,7 @@ When fares data is available, a ticket panel appears above the journeys.
 
 ### Choosing a ticket
 
-- **Outward / Return** chooses which way you are travelling.
+- **Outward / Return** (in a one-way search) chooses which way you are travelling.
   - **Outward** offers tickets bought at the origin, for travel from the origin to the destination.
   - **Return** offers return tickets bought at the destination. Their return half brings you back along this route.
 - The ticket list shows only walk-up tickets: **Anytime**, **Off-Peak** and **Super Off-Peak**. It includes singles, returns and day tickets, in standard and first class. Advance tickets are not included.
@@ -86,9 +88,20 @@ When fares data is available, a ticket panel appears above the journeys.
 Once a ticket is chosen, the panel shows:
 
 - The ticket's time restriction in words, or "No time restrictions" if it has none.
+- The ticket's rules from the fares data: how long the return half lasts ("Return within 1 month", "Return the same day") and whether a break of journey (stopping off part way and continuing later) is allowed.
 - **Show valid trains only**, which is on by default. Untick it to see every journey, with the invalid ones marked.
 
 The summary line reads "N of M journeys valid".
+
+### Return trips
+
+With a return date, the results have two tabs, **Out** and **Back**, each with its date. Back lists journeys from the destination to the origin on the return date. The Outward/Return choice described above is replaced by these tabs.
+
+- On **Out**, you choose a ticket bought at the origin, single or return, as for a one-way search.
+- On **Back**, if the Out ticket is a return, its return half is used and checked against the return direction's restrictions. The panel says so, with no ticket to choose.
+- If the Out ticket is a single, or no ticket is chosen, Back offers singles bought at the destination instead.
+- The return half must be used within the ticket's return period, counting from the outward date. For example, a day return must come back the same day, and an Off-Peak Return within a month. A period in months ends the day before the same date that many months later. When the return date is outside the period, every journey back is marked not valid, with the last (or first) date the return half can be used.
+- Tickets without a return period in the fares data are not checked this way.
 
 ### How validity is decided
 

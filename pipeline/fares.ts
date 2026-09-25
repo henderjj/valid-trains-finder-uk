@@ -9,6 +9,7 @@ import type {
   RestrictionSet,
   TicketKind,
   TicketType,
+  TicketValidity,
 } from '../src/lib/fares.ts';
 
 /** ddmmyyyy -> yyyy-mm-dd */
@@ -32,7 +33,28 @@ const KIND_LABEL: Record<TicketKind, string> = {
   superoffpeak: 'Super Off-Peak',
 };
 
-export function parseTicketTypes(lines: Iterable<string>, date: string): Record<string, TicketType> {
+/**
+ * Ticket validity periods (.TVL) current on `date`, by validity code. Each record gives the
+ * outward and return periods in days and months, how long before the return can be used,
+ * and whether a break of journey is allowed each way.
+ */
+export function parseValidities(lines: Iterable<string>, date: string): Map<string, TicketValidity> {
+  const out = new Map<string, TicketValidity>();
+  const num = (l: string, at: number) => Number(l.slice(at, at + 2)) || 0;
+  for (const l of lines) {
+    if (l.length < 54 || !current(l.slice(2, 10), l.slice(10, 18), date)) continue;
+    out.set(l.slice(0, 2), {
+      out: [num(l, 38), num(l, 40)],
+      ret: [num(l, 42), num(l, 44)],
+      after: [num(l, 46), num(l, 48), l.slice(50, 52).trim()],
+      breakOut: l[52] === 'Y',
+      breakRtn: l[53] === 'Y',
+    });
+  }
+  return out;
+}
+
+export function parseTicketTypes(lines: Iterable<string>, date: string, validities = new Map<string, TicketValidity>()): Record<string, TicketType> {
   const out: Record<string, TicketType> = {};
   for (const l of lines) {
     if (l[0] !== 'R' || !current(l.slice(4, 12), l.slice(12, 20), date)) continue;
@@ -43,7 +65,10 @@ export function parseTicketTypes(lines: Iterable<string>, date: string): Record<
     const cls = l[43] === '1' ? 1 : 2;
     const ret = type === 'R';
     const name = [KIND_LABEL[kind], /\bDAY\b/i.test(desc) ? 'Day' : '', ret ? 'Return' : 'Single'].filter(Boolean).join(' ');
-    out[l.slice(1, 4)] = { name: cls === 1 ? `${name} (First)` : name, kind, cls, ret };
+    const ticket: TicketType = { name: cls === 1 ? `${name} (First)` : name, kind, cls, ret };
+    const valid = validities.get(l.slice(75, 77));
+    if (valid) ticket.valid = valid;
+    out[l.slice(1, 4)] = ticket;
   }
   return out;
 }

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseCif } from '../pipeline/cif.ts';
 import { buildDay, buildStations, crsByTiploc, titleCase } from '../pipeline/publish.ts';
-import { clock, duration, findDirect } from '../src/lib/timetable.ts';
+import { callsOf, clock, duration, findDirect } from '../src/lib/timetable.ts';
 
 const cif = parseCif(readFileSync(new URL('./fixtures/sample.MCA', import.meta.url), 'utf8'));
 const crsOf = crsByTiploc(cif);
@@ -11,9 +11,14 @@ describe('buildDay', () => {
   it('encodes calls by CRS with times continuing past midnight', () => {
     const day = buildDay(cif, '2026-10-05', crsOf);
     expect(day.trains).toEqual([
-      { u: 'C12345', o: 'EM', h: '1F99', c: ['LGE', null, 1370, 'CHD', 1410, 1411, 'SHF', 1450, null] },
-      { u: 'C22222', o: 'EM', h: '2D10', c: ['NOT', null, 570, 'LGE', 582, null] },
+      { u: 'C12345', o: 'EM', h: '1F99', c: ['LGE', null, 1370, 'CHD', 1410, 1411, 'SHF', 1450, null], p: ['2', '1', '5'] },
+      { u: 'C22222', o: 'EM', h: '2D10', c: ['NOT', null, 570, 'LGE', 582, null], p: ['4', '1'] },
     ]);
+  });
+
+  it('gives each call its platform', () => {
+    const [train] = buildDay(cif, '2026-10-05', crsOf).trains;
+    expect(callsOf(train).map((c) => c.platform)).toEqual(['2', '1', '5']);
   });
 
   it("carries the previous evening's trains past midnight with times shifted back a day", () => {
@@ -49,6 +54,7 @@ describe('stations', () => {
       { crs: 'LGE', name: 'Long Eaton' },
       { crs: 'SHF', name: 'Sheffield' },
     ]);
+    expect(buildStations(cif, new Set(['LGE']), new Map([['LGE', 5]]))).toEqual([{ crs: 'LGE', name: 'Long Eaton', change: 5 }]);
   });
 
   it('title-cases names', () => {

@@ -10,9 +10,13 @@ export function addDays(date: string, n: number): string {
   return new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Calls as flat [crs, arr, dep] triples, with times made continuous across midnight. */
-function encodeCalls(s: Schedule, crsOf: Map<string, string>, shift: number): DayTrain['c'] {
+/**
+ * Calls as flat [crs, arr, dep] triples, with times made continuous across midnight, and
+ * each call's platform ('' when the timetable gives none).
+ */
+function encodeCalls(s: Schedule, crsOf: Map<string, string>, shift: number): { c: DayTrain['c']; p: string[] } {
   const out: DayTrain['c'] = [];
+  const platforms: string[] = [];
   let offset = 0;
   let last = -Infinity;
   const at = (t: number | null) => {
@@ -30,18 +34,21 @@ function encodeCalls(s: Schedule, crsOf: Map<string, string>, shift: number): Da
     if (n && out[n - 3] === crs) {
       // Two timing points at one station: keep the first arrival and the last departure.
       out[n - 1] = dep;
+      platforms[platforms.length - 1] ||= call.platform;
       continue;
     }
     out.push(crs, arr, dep);
+    platforms.push(call.platform);
   }
-  return out;
+  return { c: out, p: platforms };
 }
 
 function toDayTrain(s: Schedule, crsOf: Map<string, string>, shift: number): DayTrain | null {
   if (!PASSENGER.has(s.status)) return null;
-  const c = encodeCalls(s, crsOf, shift);
+  const { c, p } = encodeCalls(s, crsOf, shift);
   if (c.length < 6) return null;
   const train: DayTrain = { u: s.uid, o: s.operator, h: s.headcode, c };
+  if (p.some(Boolean)) train.p = p;
   if (BUS.has(s.status)) train.b = 1;
   return train;
 }
@@ -79,12 +86,18 @@ export function titleCase(name: string): string {
     .replace(/[a-z][a-z']*/g, (w) => (KEEP_UPPER.has(w.toUpperCase()) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)));
 }
 
-/** One entry per CRS code that trains actually call at, sorted by name. */
-export function buildStations(cif: CifFile, served: Set<string>): Station[] {
+/**
+ * One entry per CRS code that trains actually call at, sorted by name, with the station's
+ * minimum connection time where the timetable gives one.
+ */
+export function buildStations(cif: CifFile, served: Set<string>, changeTimes = new Map<string, number>()): Station[] {
   const byCrs = new Map<string, Station>();
   for (const t of cif.tiplocs.values()) {
     if (!t.crs || !served.has(t.crs) || byCrs.has(t.crs)) continue;
-    byCrs.set(t.crs, { crs: t.crs, name: titleCase(t.name) });
+    const station: Station = { crs: t.crs, name: titleCase(t.name) };
+    const change = changeTimes.get(t.crs);
+    if (change !== undefined) station.change = change;
+    byCrs.set(t.crs, station);
   }
   return [...byCrs.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

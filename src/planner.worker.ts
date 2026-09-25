@@ -1,6 +1,6 @@
 // Runs journey searches off the main thread, so the page stays responsive while a day's
 // connections are scanned.
-import { loadDay } from './lib/data.ts';
+import { loadDay, loadStations } from './lib/data.ts';
 import { buildNetwork, planJourneys, type Network } from './lib/planner.ts';
 
 export interface PlanRequest {
@@ -14,10 +14,20 @@ export type PlanResponse = { id: number; journeys: import('./lib/timetable.ts').
 
 const networks = new Map<string, Network>();
 
+/** Each station's minimum connection time, from the station list. */
+let changeTimes: Promise<Record<string, number>> | undefined;
+const loadChangeTimes = () =>
+  (changeTimes ??= loadStations()
+    .then((stations) => Object.fromEntries(stations.flatMap((s) => (s.change === undefined ? [] : [[s.crs, s.change]]))))
+    .catch(() => {
+      changeTimes = undefined;
+      return {};
+    }));
+
 self.onmessage = async (e: MessageEvent<PlanRequest>) => {
   const { id, date, from, to } = e.data;
   try {
-    const day = await loadDay(date);
+    const [day, times] = await Promise.all([loadDay(date), loadChangeTimes()]);
     let net = networks.get(date);
     if (!net) {
       net = buildNetwork(day);
@@ -25,7 +35,7 @@ self.onmessage = async (e: MessageEvent<PlanRequest>) => {
       if (networks.size >= 2) networks.delete(networks.keys().next().value!);
       networks.set(date, net);
     }
-    self.postMessage({ id, journeys: planJourneys(net, day, from, to) } satisfies PlanResponse);
+    self.postMessage({ id, journeys: planJourneys(net, day, from, to, { changeTimes: times }) } satisfies PlanResponse);
   } catch (err) {
     self.postMessage({ id, error: (err as Error).message } satisfies PlanResponse);
   }

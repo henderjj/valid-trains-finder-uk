@@ -10,8 +10,8 @@ import { createInterface } from 'node:readline';
 import { gzipSync } from 'node:zlib';
 import type { FaresMeta } from '../src/lib/fares.ts';
 import type { DataMeta } from '../src/lib/timetable.ts';
-import { CifParser, type CifFile } from './cif.ts';
-import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes } from './fares.ts';
+import { CifParser, parseChangeTimes, type CifFile } from './cif.ts';
+import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities } from './fares.ts';
 import { parsePermittedRoutes, parseRouteing } from './routeing.ts';
 import { addDays, buildDay, buildStations, crsByTiploc } from './publish.ts';
 
@@ -41,7 +41,7 @@ function member(zip: string, ext: string): string[] {
 
 /** Walk-up fares current on `date`, as one file per origin fare location code. */
 async function buildFares(zip: string, date: string) {
-  const tickets = parseTicketTypes(member(zip, 'TTY'), date);
+  const tickets = parseTicketTypes(member(zip, 'TTY'), date, parseValidities(member(zip, 'TVL'), date));
   const { files, routes, restrictions } = parseFares(member(zip, 'FFL'), tickets, date);
   const meta: FaresMeta = {
     locations: parseLocations(member(zip, 'LOC'), member(zip, 'FSC'), date),
@@ -60,7 +60,7 @@ async function buildFares(zip: string, date: string) {
   await writeFile(`${OUT}/fares-meta.json`, JSON.stringify(meta));
   await writeFile(`${OUT}/restrictions.json`, JSON.stringify(parseRestrictions(member(zip, 'RST'), restrictions)));
   console.log(
-    `Fares: ${Object.keys(tickets).length} ticket types, ${files.size} origin files, ${kb(raw)} raw, ${kb(gz)} gzip; ` +
+    `Fares: ${Object.keys(tickets).length} ticket types (${Object.values(tickets).filter((t) => t.valid).length} with validity), ${files.size} origin files, ${kb(raw)} raw, ${kb(gz)} gzip; ` +
       `${Object.keys(meta.locations).length} stations, ${restrictions.size} restriction codes`,
   );
 }
@@ -118,8 +118,17 @@ async function main() {
     console.log(`${date}  ${String(day.trains.length).padStart(6)}  ${kb(json.length).padStart(7)}  ${kb(gzipSync(json).length).padStart(7)}`);
   }
 
-  const stations = buildStations(cif, served);
+  // Stations without a minimum connection time use the planner's default.
+  let changeTimes = new Map<string, number>();
+  try {
+    changeTimes = parseChangeTimes(member('data/raw/timetable.zip', 'MSN'));
+  } catch (err) {
+    console.log(`No station change times: ${(err as Error).message}`);
+  }
+  const stations = buildStations(cif, served, changeTimes);
   await writeFile(`${OUT}/stations.json`, JSON.stringify(stations));
+  const unusual = stations.filter((s) => s.change !== undefined && (s.change < 2 || s.change > 15));
+  console.log(`Change times: ${stations.filter((s) => s.change !== undefined).length} stations; unusual: ${unusual.map((s) => `${s.crs} ${s.change}`).join(', ')}`);
   const meta: DataMeta = { built: new Date().toISOString(), from: start, to: addDays(start, days - 1) };
   await writeFile(`${OUT}/meta.json`, JSON.stringify(meta));
   console.log(`${stations.length} stations`);

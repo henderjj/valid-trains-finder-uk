@@ -5,6 +5,8 @@ export interface Station {
   /** Three-letter CRS code, e.g. "LGE". */
   crs: string;
   name: string;
+  /** Minimum minutes to change trains here, when the timetable gives one. */
+  change?: number;
 }
 
 /**
@@ -22,6 +24,8 @@ export interface DayTrain {
   /** 1 when this is a replacement or scheduled bus. */
   b?: 1;
   c: (string | number | null)[];
+  /** Platform at each call ('' when not known); left out when no call has one. */
+  p?: string[];
 }
 
 export interface DayFile {
@@ -40,6 +44,8 @@ export interface Stop {
   crs: string;
   arr: number | null;
   dep: number | null;
+  /** Planned platform, when the timetable gives one. */
+  platform?: string;
 }
 
 export interface DirectJourney {
@@ -68,7 +74,10 @@ export interface Journey {
 export function callsOf(train: DayTrain): Stop[] {
   const out: Stop[] = [];
   for (let i = 0; i < train.c.length; i += 3) {
-    out.push({ crs: train.c[i] as string, arr: train.c[i + 1] as number | null, dep: train.c[i + 2] as number | null });
+    const stop: Stop = { crs: train.c[i] as string, arr: train.c[i + 1] as number | null, dep: train.c[i + 2] as number | null };
+    const platform = train.p?.[i / 3];
+    if (platform) stop.platform = platform;
+    out.push(stop);
   }
   return out;
 }
