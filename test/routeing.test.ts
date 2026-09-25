@@ -143,3 +143,9 @@ describe('tracing', () => {
     expect(spur.check(journey(leg('XC', 'NUN', 'BHM'), leg('XC', 'BHM', 'XXX'))).why).toBe('no track data from BHM to XXX');
   });
 });
+
+describe('stops missing from the map', () => {
+  it('passes over them in the middle of a leg', () => {
+    expect(routeing.check(journey(leg('EM', 'LGE', 'DBY'), leg('XC', 'DBY', 'TAH', 'SOT', 'MAN'))).permitted).toBe(true);
+  });
+});

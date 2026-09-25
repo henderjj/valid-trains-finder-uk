@@ -203,15 +203,18 @@ export class Routeing {
       path.miles.push(miles);
     };
     for (const [k, leg] of journey.legs.entries()) {
+      // Some timetable codes aren't on the map (Tamworth High Level is drawn as Tamworth), so
+      // stops in the middle of a leg without track data are passed over.
+      const calls = leg.calls.map((c) => this.station(c.crs)).filter((c, i, all) => i === 0 || i === all.length - 1 || leg.bus || this.graph.has(c));
       if (k > 0) path.changes.push(path.stations.length - 1);
-      if (!path.stations.length) add(this.station(leg.calls[0].crs));
-      for (let i = 0; i + 1 < leg.calls.length; i++) {
+      if (!path.stations.length) add(calls[0]);
+      for (let i = 0; i + 1 < calls.length; i++) {
         if (leg.bus) {
-          add(this.station(leg.calls[i + 1].crs));
+          add(calls[i + 1]);
           continue;
         }
-        const p = this.shortest(leg.calls[i].crs, leg.calls[i + 1].crs);
-        if (!p) return { missing: [leg.calls[i].crs, leg.calls[i + 1].crs] };
+        const p = this.shortest(calls[i], calls[i + 1]);
+        if (!p) return { missing: [calls[i], calls[i + 1]] };
         for (let s = 1; s < p.via.length; s++) {
           miles += this.shortest(p.via[s - 1], p.via[s])!.miles;
           add(p.via[s]);
