@@ -68,11 +68,14 @@ async function buildFares(zip: string, date: string) {
 async function buildRouteing(zip: string) {
   const data = parseRouteing({
     stations: member(zip, 'RGS'),
+    groups: member(zip, 'RGG'),
     points: member(zip, 'RGP'),
+    nodes: member(zip, 'RGN'),
     links: member(zip, 'RGL'),
     distances: member(zip, 'RGD'),
     london: member(zip, 'RGC'),
     newStations: member(zip, 'RGX'),
+    fareRoutes: member(zip, 'RGK'),
   });
   const routes = parsePermittedRoutes(member(zip, 'RGR'));
   await mkdir(`${OUT}/routeing`, { recursive: true });
@@ -86,6 +89,7 @@ async function buildRouteing(zip: string) {
   await writeFile(`${OUT}/routeing.json`, json);
   console.log(
     `Routeing: ${Object.keys(data.stations).length} stations, ${data.points.length} routeing points, ` +
+      `${Object.keys(data.fareRoutes).length} fare routes, London group ${data.london}, ` +
       `${kb(json.length)} (${kb(gzipSync(json).length)} gzip); ${routes.size} route files, ${kb(gz)} gzip`,
   );
 }

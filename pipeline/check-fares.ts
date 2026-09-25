@@ -31,14 +31,16 @@ let routeing: Routeing | undefined;
 if (existsSync(`${DATA}/routeing.json`)) {
   const data = read<RouteingData>('routeing.json');
   const routes = new Map<string, PermittedRoutes>();
-  const codes = new Set([from, to].flatMap((crs) => [...new Routeing(data, new Map()).pointsOf(crs)]));
+  const codes = new Routeing(data, new Map()).routeFiles(from, to);
   for (const code of codes) if (existsSync(`${DATA}/routeing/${code}.json`)) routes.set(code, read<PermittedRoutes>(`routeing/${code}.json`));
   routeing = new Routeing(data, routes);
   const t = performance.now();
   const results = journeys.map((j) => routeing!.check(j));
-  console.log(`Routeing points ${[...codes].join(',')}; checked ${journeys.length} journeys in ${(performance.now() - t).toFixed(0)} ms`);
+  console.log(`Routeing points ${codes.join(',')}; checked ${journeys.length} journeys in ${(performance.now() - t).toFixed(0)} ms`);
   journeys.forEach((j, k) => {
-    if (results[k] !== true) console.log(`  ${results[k] === false ? 'NOT PERMITTED' : 'unknown'}: ${clock(j.dep)}-${clock(j.arr)} ${j.legs.map((l) => l.calls[0].crs).join(' > ')} > ${to}`);
+    const r = results[k];
+    const label = r.permitted === true ? 'permitted' : r.permitted === false ? 'NOT PERMITTED' : 'unknown';
+    if (j.legs.length > 1) console.log(`  ${label}: ${clock(j.dep)}-${clock(j.arr)} ${j.legs.map((l) => l.calls[0].crs).join(' > ')} > ${to} (${r.why})`);
   });
 }
 console.log(`Network ${(built - started).toFixed(0)} ms, search ${(performance.now() - built).toFixed(0)} ms`);

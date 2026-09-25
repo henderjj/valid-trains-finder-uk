@@ -21,10 +21,13 @@ jobs:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
       - run: npm run data:build -- 2026-09-28 1
-      - run: grep -o '"LGE":\[[^]]*\]\|"MAN":\[[^]]*\]\|"SHF":\[[^]]*\]\|"EDB":\[[^]]*\]' public/data/routeing.json
+      - run: node -e "const d=require('./public/data/routeing.json'); console.log(d.london, d.nodes.length, Object.keys(d.fareRoutes).length, JSON.stringify(Object.entries(d.fareRoutes).slice(0,8)))"
       - run: npm run -s data:check -- LGE MAN | sed -n '1,/^$/p'
-      - run: npm run -s data:check -- LGE SHF | sed -n '1,/^$/p'
-      - run: npm run -s data:check -- LGE LDS | sed -n '1,/^$/p'
-      - run: npm run -s data:check -- KGX EDB | sed -n '1,/^$/p'
-      - run: npm run -s data:check -- NOT BHM | sed -n '1,/^$/p'
       - run: npm run -s data:check -- DBY LIV | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- NOT BHM | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- KGX EDB | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- LGE SHF | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- NRW BHM | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- PBO BRI | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- CHD LGE | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- LGE MAN | grep -B1 -A3 -i 'via\\|not ' | head -80

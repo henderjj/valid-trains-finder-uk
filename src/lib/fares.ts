@@ -146,8 +146,8 @@ const inWindow = (t: number, w: TimeWindow) => {
 
 /**
  * Operator limits read from a route description: "LNER ONLY" allows only those operators,
- * "NOT LNER" excludes them. Other routes (via a station, avoiding one) need routeing checks
- * and are not interpreted here.
+ * "NOT LNER" excludes them. Other routes (via a station, avoiding one) are checked with the
+ * routeing guide's route data.
  */
 export function routeOperators(desc: string): { only?: string[]; not?: string[] } {
   // Descriptions are 16 characters and sometimes end in a full stop or a bracketed code.
@@ -257,9 +257,10 @@ export function fareValidity(
 ): Validity {
   const route = checkRoute(journey, fare.routeName);
   if (!route.valid) return route;
-  if (routeing && journey.legs.length > 1 && routeing.check(journey) === false) {
+  if (routeing && routeing.checkFare(journey, fare.route).permitted === false) {
+    if (journey.legs.length === 1) return { valid: false, reason: `Not valid: this train doesn't go the way the ticket's route (${fare.routeName.trim()}) requires` };
     const via = journey.legs.slice(1).map((l) => names(l.calls[0].crs));
-    return { valid: false, reason: `Not valid: changing at ${via.join(' and ')} is not a permitted route` };
+    return { valid: false, reason: `Not valid: changing at ${via.join(' and ')} is not a permitted route for this ticket` };
   }
   return checkValidity(journey, fare.restriction, set, date, dir, names);
 }
