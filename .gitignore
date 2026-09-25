@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# Raw feeds and build output: large, and derived from licensed data
+data/
+# RSPS feed specifications are confidential (copyright Rail Settlement Plan)
+specs/
+*.pdf
+.env

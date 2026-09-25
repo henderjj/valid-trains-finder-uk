@@ -1,0 +1,10 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+  background: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { color: #eee; background: #121212; }
+}
+main { max-width: 40rem; margin: 0 auto; padding: 1rem; }
+footer { margin-top: 3rem; font-size: 0.85rem; opacity: 0.75; }

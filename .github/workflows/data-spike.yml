@@ -1,0 +1,28 @@
+# Phase 0: download the timetable feed and report per-day file sizes.
+# Run by hand from the Actions tab once NRDP_USERNAME and NRDP_PASSWORD secrets are set.
+name: Data spike
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Number of days to build
+        default: '7'
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download timetable feed
+        run: npm run data:download -- timetable
+        env:
+          NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
+          NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
+      - name: Build per-day files and report sizes
+        run: npm run data:build -- "$(date -u +%F)" "${{ inputs.days }}" | tee -a "$GITHUB_STEP_SUMMARY"
