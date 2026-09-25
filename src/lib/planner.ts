@@ -36,18 +36,38 @@ export function buildNetwork(day: DayFile): Network {
     return i;
   };
   const calls = day.trains.map(callsOf);
-  const rows: [number, number, number, number, number, number][] = [];
+  let count = 0;
+  for (const cs of calls) count += Math.max(cs.length - 1, 0);
+  const raw = { from: new Int32Array(count), to: new Int32Array(count), dep: new Int32Array(count), arr: new Int32Array(count), train: new Int32Array(count), call: new Int32Array(count) };
+  let n = 0;
   calls.forEach((cs, t) => {
     for (let i = 0; i + 1 < cs.length; i++) {
       const dep = cs[i].dep ?? cs[i].arr;
       const arr = cs[i + 1].arr ?? cs[i + 1].dep;
       if (dep === null || arr === null) continue;
-      rows.push([index(cs[i].crs), index(cs[i + 1].crs), dep, arr, t, i]);
+      raw.from[n] = index(cs[i].crs);
+      raw.to[n] = index(cs[i + 1].crs);
+      raw.dep[n] = dep;
+      raw.arr[n] = arr;
+      raw.train[n] = t;
+      raw.call[n] = i;
+      n++;
     }
   });
-  rows.sort((a, b) => a[2] - b[2] || a[3] - b[3]);
-  const col = (k: number) => Int32Array.from(rows, (r) => r[k]);
-  return { stations, trains: day.trains, calls, from: col(0), to: col(1), dep: col(2), arr: col(3), train: col(4), call: col(5) };
+  // Sorting an index of typed arrays is much quicker than sorting an array of tuples.
+  const order = new Uint32Array(n).map((_, i) => i).sort((a, b) => raw.dep[a] - raw.dep[b] || raw.arr[a] - raw.arr[b]);
+  const col = (src: Int32Array) => Int32Array.from(order, (i) => src[i]);
+  return {
+    stations,
+    trains: day.trains,
+    calls,
+    from: col(raw.from),
+    to: col(raw.to),
+    dep: col(raw.dep),
+    arr: col(raw.arr),
+    train: col(raw.train),
+    call: col(raw.call),
+  };
 }
 
 const NONE = 0x3fffffff;
