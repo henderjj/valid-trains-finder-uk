@@ -9,6 +9,20 @@ export default defineConfig({
     preact(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // Day files are large, so they are cached as they are used rather than up front.
+        globIgnores: ['data/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/data/'),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'timetable-data',
+              expiration: { maxEntries: 40 },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'Valid Trains Finder',
         short_name: 'Valid Trains',

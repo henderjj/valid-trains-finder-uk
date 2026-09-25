@@ -19,6 +19,8 @@ export interface Schedule {
   /** Seven flags, Monday first. */
   days: string;
   stp: StpIndicator;
+  /** P passenger, B bus, F freight, S ship, T trip; 1-5 are their short-term variants. */
+  status: string;
   headcode: string;
   operator: string;
   calls: Call[];
@@ -86,6 +88,7 @@ export class CifParser {
           to: cifDate(line.substr(15, 6)),
           days: line.substr(21, 7),
           stp: line[79] as StpIndicator,
+          status: line[29] ?? ' ',
           headcode: field(line, 32, 4),
           operator: '',
           calls: [],

@@ -22,8 +22,16 @@ npm run typecheck
 ```sh
 export NRDP_USERNAME=... NRDP_PASSWORD=...
 npm run data:download -- timetable   # saves data/raw/timetable.zip
-npm run data:build -- 2026-10-05 7   # writes data/site/, prints per-day sizes
+npm run data:build -- 2026-10-05 7   # writes public/data/, prints per-day sizes
+npm run dev                          # the app now reads the local data
 ```
 
-`data/` is ignored by git. The RSPS feed specifications are confidential and must not
+`data/` and `public/data/` are ignored by git. The RSPS feed specifications are confidential and must not
 be committed (`specs/` and `*.pdf` are ignored).
+
+## Deployment
+
+The **Deploy** workflow runs on every push to `main` (and by hand from the Actions tab).
+It downloads the timetable, builds 28 days of data plus the app, and publishes both to
+GitHub Pages. Pages must be enabled once under **Settings → Pages → Source: GitHub
+Actions**.
