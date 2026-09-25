@@ -15,7 +15,7 @@ const data = parseRouteing({
   distances: ['LGE,DBY,10', 'DBY,LGE,10', 'DBY,CHD,24', 'CHD,SHF,12', 'SHF,MAN,40', 'LGE,LEI,20', 'LEI,NUN,20', 'NUN,SOT,40', 'SOT,MAN,40', 'DBY,SOT,30', 'MAN,MCV,1'],
   london: ['KGX,Y,Y'],
   newStations: ['LGE,NEW,01012026,31122999'],
-  fareRoutes: ['00079,L,3', '00079,D,A,SHF,N,,', '00302,D,E,SHF,N,,', '00400,D,X,,,,XC', '00500,D,A,DBY,Y,,'],
+  fareRoutes: ['00079,L,3', '00079,D,A,SHF,N,,', '00200,L,1', '00700,L,0', '00302,D,E,SHF,N,,', '00400,D,X,,,,XC', '00500,D,A,DBY,Y,,'],
 });
 const routes = parsePermittedRoutes(['G09,G20,XA', 'G09,G20,YB']);
 const routeing = new Routeing(data, routes);
@@ -52,6 +52,9 @@ describe('routeing guide data', () => {
     expect(data.fareRoutes['00079']).toEqual({ all: [['SHF']] });
     expect(data.fareRoutes['00302']).toEqual({ not: [['SHF']] });
     expect(data.fareRoutes['00400']).toEqual({ notTocs: ['XC'] });
+    // "VIA LONDON" and "NOT VIA LONDON" come only from the London marker.
+    expect(data.fareRoutes['00200']).toEqual({ all: [['KGX']] });
+    expect(data.fareRoutes['00700']).toEqual({ not: [['KGX']] });
     // A group marker takes in every station in the group.
     expect(data.fareRoutes['00500']).toEqual({ all: [['DBY']] });
   });
@@ -102,6 +105,11 @@ describe('fare routes', () => {
   it('rejects places a route avoids', () => {
     expect(routeing.checkFare(viaSheffield, '00302')).toEqual({ permitted: false, why: 'goes via SHF' });
     expect(routeing.checkFare(viaStoke, '00302').permitted).toBe(true);
+  });
+
+  it('requires London for a route via London', () => {
+    expect(routeing.checkFare(viaStoke, '00200')).toEqual({ permitted: false, why: 'does not go via KGX' });
+    expect(routeing.checkFare(viaStoke, '00700').permitted).toBe(true);
   });
 
   it('rejects operators a route excludes', () => {

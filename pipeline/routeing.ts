@@ -58,7 +58,9 @@ export function parseRouteing(files: {
   // RGC: London station, London terminal (Y/N), cross-London transfer (Y/N). The London
   // group is the group most London terminals are in.
   const count = new Map<string, number>();
+  const londonCodes: string[] = [];
   for (const [crs, terminal] of rows(files.london)) {
+    londonCodes.push(crs);
     const group = data.groups[crs];
     if (terminal === 'Y' && group) count.set(group, (count.get(group) ?? 0) + 1);
   }
@@ -68,9 +70,17 @@ export function parseRouteing(files: {
   // RGK route data: route, D, entry type, CRS, group marker, mode, TOC.
   const members = new Map<string, string[]>();
   for (const [crs, group] of Object.entries(data.groups)) members.set(group, [...(members.get(group) ?? []), crs]);
+  // London is the London group's stations plus the others listed for cross-London journeys.
+  const londonStations = [...new Set([...(members.get(data.london) ?? []), ...londonCodes])];
   for (const [route, type, entry, crs, group, , toc] of rows(files.fareRoutes)) {
-    if (type !== 'D') continue;
     const r = (data.fareRoutes[route] ??= {});
+    // London route record: 0 the route excludes London, 1 it must include London.
+    if (type === 'L') {
+      if (entry === '1') (r.all ??= []).push(londonStations);
+      else if (entry === '0') (r.not ??= []).push(londonStations);
+      continue;
+    }
+    if (type !== 'D') continue;
     const place = group === 'Y' && data.groups[crs] ? members.get(data.groups[crs])! : [crs];
     if (entry === 'A') (r.all ??= []).push(place);
     else if (entry === 'I') (r.any ??= []).push(place);

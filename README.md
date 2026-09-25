@@ -8,6 +8,9 @@ fares feeds.
 Contains data from National Rail Enquiries. This is not an official service; always
 check before you travel.
 
+See [docs/functionality.md](docs/functionality.md) for everything the app does and the
+rules it uses to decide which trains a ticket is valid on.
+
 ## Development
 
 ```sh
@@ -32,6 +35,7 @@ be committed (`specs/` and `*.pdf` are ignored).
 ## Deployment
 
 The **Deploy** workflow runs on every push to `main` (and by hand from the Actions tab).
-It downloads the timetable, builds 28 days of data plus the app, and publishes both to
+It also runs every Monday at 03:30 UTC. It downloads the timetable, fares and routeing
+guide, builds 28 days of data plus the app, and publishes both to
 GitHub Pages. Pages must be enabled once under **Settings → Pages → Source: GitHub
 Actions**.
