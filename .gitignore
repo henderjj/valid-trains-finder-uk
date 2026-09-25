@@ -6,3 +6,5 @@ data/
 specs/
 *.pdf
 .env
+# Built data files (npm run data:build)
+public/data/

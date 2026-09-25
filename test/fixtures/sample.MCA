@@ -3,17 +3,17 @@ TILGEATON         LONG EATON                         LGE
 TINTNG            NOTTINGHAM                         NOT
 TISHEFFLD         SHEFFIELD                          SHF
 TICHFD            CHESTERFIELD                       CHD
-BSNC123452609012612311111100    1F99                                           P
+BSNC123452609012612311111100 P  1F99                                           P
 BX         EM
 LOLGEATON 2250 22502
 LICHFD              2330
 LTSHEFFLD 0010 00105
-BSNC123452610052610051000000    1F99                                           O
+BSNC123452610052610051000000 P  1F99                                           O
 BX         EM
 LOLGEATON 2250 22502
 LICHFD    2330 2331      233023311
 LTSHEFFLD 0010 00105
-BSNC222222609019999991111111    2D10                                           P
+BSNC222222609019999991111111 P  2D10                                           P
 BX         EM
 LONTNG    0930 09304
 LTLGEATON 0942 09421
