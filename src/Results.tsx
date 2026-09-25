@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { RouteFares, Trip } from './App.tsx';
+import { ukToday } from './lib/data.ts';
 import { fareValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
 import { operatorName } from './lib/operators.ts';
 import { clock, duration, type Journey, type Station } from './lib/timetable.ts';
@@ -26,6 +27,9 @@ const price = (pence: number) => `£${(pence / 100).toFixed(2)}`;
 const optionKey = (f: FareOption) => `${f.ticket}/${f.route}`;
 const optionLabel = (f: FareOption) =>
   `${f.type.name} · ${price(f.pence)}${f.route === '00000' ? '' : ` · ${f.routeName}`}`;
+
+/** National Rail's live departures between two stations. */
+const liveTimes = (from: string, to: string) => `https://www.nationalrail.co.uk/live-trains/departures/${from}/${to}/`;
 
 const pick = (options: FareOption[], key: string) =>
   options.find((f) => optionKey(f) === key) ?? options.find((f) => f.ticket === key.split('/')[0]);
@@ -75,6 +79,7 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
   const restriction = ticket?.restriction ? restrictionSetFor(fares?.sets ?? [], day)?.restrictions[ticket.restriction] : undefined;
   const restrictionText = restriction && (dir === 'O' ? restriction.out : restriction.rtn || restriction.out);
 
+  const today = day === ukToday();
   const kind = directOnly ? 'direct ' : '';
   const count = `${pool.length} ${kind}${pool.length === 1 ? 'journey' : 'journeys'}`;
   const summary = !pool.length ? `No ${kind}journeys found` : ticket ? `${validCount} of ${count} valid` : count;
@@ -218,14 +223,22 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
                       </p>
                     )}
                     <p class="leg-title">
-                      {operatorName(leg.operator)}
-                      {leg.bus ? ' bus' : ''}
+                      <span>
+                        {operatorName(leg.operator)}
+                        {leg.bus ? ' bus' : ''}
+                      </span>
+                      {today && (
+                        <a href={liveTimes(leg.calls[0].crs, leg.calls[leg.calls.length - 1].crs)} target="_blank" rel="noopener">
+                          Live times
+                        </a>
+                      )}
                     </p>
                     <ol class="calls">
                       {leg.calls.map((c, i) => (
                         <li key={`${c.crs}-${i}`}>
                           <span class="call-time">{clock((i === 0 ? c.dep : c.arr) ?? c.dep ?? 0)}</span>
                           <span>{name(c.crs)}</span>
+                          {c.platform && <span class="platform">Plat {c.platform}</span>}
                         </li>
                       ))}
                     </ol>

@@ -340,7 +340,22 @@ select {
 }
 
 .leg-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
   font-weight: 600;
+}
+
+.leg-title a {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.platform {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .change {
