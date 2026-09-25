@@ -44,18 +44,23 @@ function member(zip: string, ext: string): string[] {
     .filter((l) => l && !l.startsWith('/'));
 }
 
+/** Like member(), but an empty list (and a note) when the feed has no such file. */
+function optionalMember(zip: string, ext: string): string[] {
+  try {
+    return member(zip, ext);
+  } catch (err) {
+    console.log(`${(err as Error).message}; carrying on without it`);
+    return [];
+  }
+}
+
 /** Walk-up fares current on `date`, as one file per origin fare location code. */
 async function buildFares(zip: string, date: string): Promise<{ summary: NonNullable<BuildSummary['fares']>; routes: Record<string, string> }> {
   // Operator names first, so route descriptions naming a new operator can be read.
-  let operators: Record<string, string> = {};
-  try {
-    operators = parseOperators(member(zip, 'TOC'), titleCase);
-  } catch (err) {
-    console.log(`No operator names: ${(err as Error).message}`);
-  }
+  const operators = parseOperators(optionalMember(zip, 'TOC'), titleCase);
   registerOperators(operators);
   await writeFile(`${OUT}/operators.json`, JSON.stringify(operators));
-  const tickets = parseTicketTypes(member(zip, 'TTY'), date, parseValidities(member(zip, 'TVL'), date));
+  const tickets = parseTicketTypes(member(zip, 'TTY'), date, parseValidities(optionalMember(zip, 'TVL'), date));
   const { files, routes, restrictions } = parseFares(member(zip, 'FFL'), tickets, date);
   const meta: FaresMeta = {
     locations: parseLocations(member(zip, 'LOC'), member(zip, 'FSC'), date),
@@ -147,12 +152,7 @@ async function main() {
   }
 
   // Stations without a minimum connection time use the planner's default.
-  let changeTimes = new Map<string, number>();
-  try {
-    changeTimes = parseChangeTimes(member('data/raw/timetable.zip', 'MSN'));
-  } catch (err) {
-    console.log(`No station change times: ${(err as Error).message}`);
-  }
+  const changeTimes = parseChangeTimes(optionalMember('data/raw/timetable.zip', 'MSN'));
   const stations = buildStations(cif, served, changeTimes);
   await writeFile(`${OUT}/stations.json`, JSON.stringify(stations));
   const unusual = stations.filter((s) => s.change !== undefined && (s.change < 2 || s.change > 15));
@@ -170,9 +170,11 @@ async function main() {
   if (!routeing) console.log('No routeing guide downloaded; skipping routeing');
 
   // Routes that limit operators in words the app can't read, and that the routeing guide
-  // has no data for, can't be checked at all.
+  // has no data for, can't be checked at all. A few name no train operator at all: fares
+  // not for travel, and West Midlands Metro trams, which aren't in the rail timetable.
+  const noOperator = /^(?:NOT FOR TRAVEL|DO NOT USE|NOT TO BE USED|MID METRO ONLY)$/;
   const unreadableRoutes = Object.entries(fares?.routes ?? {})
-    .filter(([code, desc]) => routeOperators(desc).unread && !routeing?.fareRoutes.has(code))
+    .filter(([code, desc]) => routeOperators(desc).unread && !routeing?.fareRoutes.has(code) && !noOperator.test(desc.trim()))
     .map(([code, desc]) => `${desc} (${code})`);
   const result = checkData({
     days: dayCounts,

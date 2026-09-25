@@ -45,7 +45,7 @@ The app lists every journey that leaves the origin on the chosen date (00:00 to 
 
 - Departure and arrival times, and the journey's duration.
 - Whether it is direct ("Direct, non-stop" or "Direct, N stops") or how many changes it has and where ("1 change at Derby").
-- The train operators, plus "Bus" when any part is a replacement or scheduled bus.
+- The train operators, plus "Bus" when any part is a replacement or scheduled bus. Operator names come from a list in the app, or from the fares data's operator list for an operator the app doesn't know yet; an operator in neither is shown by its two-letter code.
 - A validity badge when a ticket is chosen (see below).
 
 Tap a journey to expand it. The expanded view shows each train's operator and its calls with times and planned platforms ("Plat 4A", where the timetable gives one), and "Change at X, N min to change" between trains. When the journey is today, each train also has a **Live times** link, which opens National Rail's live departures between the stations where you board and leave that train.
@@ -107,7 +107,8 @@ With a return date, the results have two tabs, **Out** and **Back**, each with i
 
 A journey is valid for a ticket only if it passes all of these checks, in this order. The first check that fails gives the reason shown on the journey.
 
-1. **Operators named in the ticket's route.** Routes such as "LNER ONLY" allow only those operators' trains, and routes such as "NOT HEATHROW EXP" exclude them. Every train in the journey must be allowed.
+1. **Operators named in the ticket's route.** Routes such as "LNER ONLY" allow only those operators' trains, and routes such as "NOT HEATHROW EXP" exclude them. Every train in the journey must be allowed. The app reads the many ways the fares data writes operator names ("EMR-ONLY", "S W RAILWAY ONLY", "TP HT GW ONLY"), including names from the fares data's operator list.
+   - When a route says "ONLY" or "NOT" but the app can't read the names, and the routeing guide has no data for that route either, the app can't check it. The journey then shows as valid with the note "The app can't check this ticket's route (…); check before you travel".
    - Reason shown: "this ticket is LNER only (the 09:05 is Lumo)" or "this ticket is not valid on …".
 2. **Permitted route** (from the National Routeing Guide), described in the next section.
    - Reasons shown: "changing at X and Y is not a permitted route for this ticket", or "doesn't go the way the ticket's route (VIA SHEFFIELD) requires" when the journey misses a place or operator the ticket's route names.
@@ -162,6 +163,8 @@ These gaps mean a journey is sometimes marked not valid when it is in fact allow
 ## Data and updates
 
 - The **Deploy** workflow rebuilds the data every Monday at 03:30 UTC and on every change to the app. It uses the latest timetable, fares and routeing guide feeds.
+- Before publishing, the build checks the data looks complete. It needs a typical day to have at least 15,000 trains and every day at least 5,000 (except Christmas Day and Boxing Day). It also needs at least 2,000 stations and 1,000 station connection times, the Anytime Single and Return ticket types, at least 2,000 fares files and 100 restriction codes, and at least 200 routeing points and 100 fare routes. If any check fails, nothing is published, so the app keeps the last good data, and GitHub reports the run as failed.
+- The build also warns, without stopping, about operators with no name and about ticket routes naming operators it can't read. The warnings show on the workflow run's page, and the fix is to add the names to `src/lib/operators.ts`.
 - The footer shows when the timetable data was last updated.
 - The footer also carries the credit "Contains data from National Rail Enquiries" and the not-official disclaimer.
 - If the fares or routeing data can't be loaded, the app still lists trains. It shows no ticket panel, or skips the permitted-route check.

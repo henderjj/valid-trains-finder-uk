@@ -173,6 +173,7 @@ describe('routes', () => {
     expect(routeOperators('TFWRS  ONLY')).toEqual({ only: ['AW'] });
     expect(routeOperators('XC & NORTHN ONLY')).toEqual({ only: ['XC', 'NT'] });
     expect(routeOperators('IPS-NRW ONLY')).toEqual({ unread: true });
+    expect(routeOperators('NOT UNDERGROUND')).toEqual({ not: ['LT'] });
   });
 
   it('marks trains of other operators not valid on an operator-only fare', () => {
