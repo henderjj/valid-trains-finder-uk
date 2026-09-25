@@ -1,0 +1,25 @@
+# Temporary Phase 2 spike: downloads the fares feed and prints its structure.
+name: Fares inspect
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase-2-validity]
+    paths: [pipeline/inspect-fares.ts, .github/workflows/fares-inspect.yml]
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Download fares feed
+        run: npm run data:download -- fares
+        env:
+          NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
+          NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
+      - run: npm run -s data:inspect-fares

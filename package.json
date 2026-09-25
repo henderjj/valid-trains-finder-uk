@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "data:download": "tsx pipeline/download.ts",
-    "data:build": "tsx pipeline/build.ts"
+    "data:build": "tsx pipeline/build.ts",
+    "data:inspect-fares": "tsx pipeline/inspect-fares.ts"
   },
   "dependencies": {
     "preact": "^10.29.8"
