@@ -130,8 +130,9 @@ first check that fails gives the reason shown on the journey.
      not valid on …".
 2. **Permitted route** (from the National Routeing Guide), described in the next
    section.
-   - Reasons shown: "changing at X and Y is not a permitted route for this ticket" or
-     "this train doesn't go the way the ticket's route requires".
+   - Reasons shown: "changing at X and Y is not a permitted route for this ticket", or
+     "doesn't go the way the ticket's route (VIA SHEFFIELD) requires" when the journey
+     misses a place or operator the ticket's route names.
 3. **Time restrictions** (the restriction code on the fare, for example Off-Peak
    codes). A restriction applies only on the dates and days of the week it covers.
    - **Listed trains.** A restriction can list specific trains as not valid (reason:
@@ -174,7 +175,7 @@ app follows the routeing guide data feed specification (RSPS5047):
      station group.
 5. **Routes named on the ticket.** Many fares name places the journey must pass or
    avoid ("VIA SHEFFIELD", "NOT VIA LONDON"), or operators that must or mustn't be
-   used.
+   used. "London" means any station in the London group or listed as a London station.
    - The journey must pass every required place, or one of them where the route
      allows a choice, and must avoid every excluded place.
    - A station group counts as a place: any station in the group counts.

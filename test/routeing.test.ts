@@ -98,22 +98,22 @@ describe('permitted routes', () => {
 
 describe('fare routes', () => {
   it('requires the places a route goes via', () => {
-    expect(routeing.checkFare(viaStoke, '00079')).toEqual({ permitted: false, why: 'does not go via SHF' });
+    expect(routeing.checkFare(viaStoke, '00079')).toMatchObject({ permitted: false, why: 'does not go via SHF', byFareRoute: true });
     expect(routeing.checkFare(viaSheffield, '00079').permitted).toBe(true);
   });
 
   it('rejects places a route avoids', () => {
-    expect(routeing.checkFare(viaSheffield, '00302')).toEqual({ permitted: false, why: 'goes via SHF' });
+    expect(routeing.checkFare(viaSheffield, '00302')).toMatchObject({ permitted: false, why: 'goes via SHF', byFareRoute: true });
     expect(routeing.checkFare(viaStoke, '00302').permitted).toBe(true);
   });
 
   it('requires London for a route via London', () => {
-    expect(routeing.checkFare(viaStoke, '00200')).toEqual({ permitted: false, why: 'does not go via KGX' });
+    expect(routeing.checkFare(viaStoke, '00200')).toMatchObject({ permitted: false, why: 'does not go via KGX', byFareRoute: true });
     expect(routeing.checkFare(viaStoke, '00700').permitted).toBe(true);
   });
 
   it('rejects operators a route excludes', () => {
-    expect(routeing.checkFare(viaStoke, '00400')).toEqual({ permitted: false, why: 'uses XC' });
+    expect(routeing.checkFare(viaStoke, '00400')).toMatchObject({ permitted: false, why: 'uses XC', byFareRoute: true });
   });
 
   it('counts a place passed without stopping', () => {

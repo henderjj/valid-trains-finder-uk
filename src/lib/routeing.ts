@@ -58,6 +58,8 @@ export interface RouteCheck {
   permitted: boolean | undefined;
   /** Why, in a few words, for checking by hand. */
   why: string;
+  /** True when the fare's own route (a place or operator it names) is what rules the journey out. */
+  byFareRoute?: boolean;
 }
 
 /** A journey as the stations it passes, with where it changes trains. */
@@ -243,12 +245,12 @@ export class Routeing {
     if (!r || !path || 'missing' in path) return this.check(journey);
     const passes = (alternatives: string[]) => path.stations.some((s) => alternatives.includes(s));
     const missing = r.all?.find((a) => !passes(a)) ?? (r.any && !r.any.some(passes) ? r.any.flat() : undefined);
-    if (missing) return { permitted: false, why: `does not go via ${missing[0]}` };
+    if (missing) return { permitted: false, why: `does not go via ${missing[0]}`, byFareRoute: true };
     const avoided = r.not?.find(passes);
-    if (avoided) return { permitted: false, why: `goes via ${avoided.find((s) => path.stations.includes(s))}` };
-    if (r.tocs && !path.operators.some((o) => r.tocs!.includes(o))) return { permitted: false, why: `no ${r.tocs.join('/')} train` };
+    if (avoided) return { permitted: false, why: `goes via ${avoided.find((s) => path.stations.includes(s))}`, byFareRoute: true };
+    if (r.tocs && !path.operators.some((o) => r.tocs!.includes(o))) return { permitted: false, why: `no ${r.tocs.join('/')} train`, byFareRoute: true };
     const barred = r.notTocs && path.operators.find((o) => r.notTocs!.includes(o));
-    if (barred) return { permitted: false, why: `uses ${barred}` };
+    if (barred) return { permitted: false, why: `uses ${barred}`, byFareRoute: true };
 
     if (journey.legs.length === 1) return { permitted: true, why: 'one train' };
     const whole = this.checkPath(path, 0, path.stations.length - 1);

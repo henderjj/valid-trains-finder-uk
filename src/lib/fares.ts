@@ -257,8 +257,11 @@ export function fareValidity(
 ): Validity {
   const route = checkRoute(journey, fare.routeName);
   if (!route.valid) return route;
-  if (routeing && routeing.checkFare(journey, fare.route).permitted === false) {
-    if (journey.legs.length === 1) return { valid: false, reason: `Not valid: this train doesn't go the way the ticket's route (${fare.routeName.trim()}) requires` };
+  const routed = routeing?.checkFare(journey, fare.route);
+  if (routed?.permitted === false) {
+    if (routed.byFareRoute || journey.legs.length === 1) {
+      return { valid: false, reason: `Not valid: doesn't go the way the ticket's route (${fare.routeName.trim()}) requires` };
+    }
     const via = journey.legs.slice(1).map((l) => names(l.calls[0].crs));
     return { valid: false, reason: `Not valid: changing at ${via.join(' and ')} is not a permitted route for this ticket` };
   }
