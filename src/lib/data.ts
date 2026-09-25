@@ -1,5 +1,6 @@
 // Loads the published data files. The service worker caches them, so a day that has been
 // searched once also works offline.
+import { faresBetween, type FareFile, type FareOption, type FaresMeta, type RestrictionSet } from './fares.ts';
 import type { DataMeta, DayFile, Station } from './timetable.ts';
 
 const base = `${import.meta.env.BASE_URL}data/`;
@@ -22,6 +23,38 @@ export function loadDay(date: string): Promise<DayFile> {
     days.set(date, day);
   }
   return day;
+}
+
+const once = <T>(load: () => Promise<T>) => {
+  let p: Promise<T> | undefined;
+  return () => {
+    p ??= load();
+    p.catch(() => (p = undefined));
+    return p;
+  };
+};
+
+const loadFaresMeta = once(() => getJson<FaresMeta>('fares-meta.json'));
+export const loadRestrictions = once(() => getJson<RestrictionSet[]>('restrictions.json'));
+
+const fareFiles = new Map<string, Promise<FareFile>>();
+function loadFareFile(code: string): Promise<FareFile> {
+  let file = fareFiles.get(code);
+  if (!file) {
+    // Most location codes have no fares of their own, so a missing file just means none.
+    file = fetch(`${base}fares/${code}.json`).then((res) => (res.ok ? (res.json() as Promise<FareFile>) : {}));
+    file.catch(() => fareFiles.delete(code));
+    fareFiles.set(code, file);
+  }
+  return file;
+}
+
+/** Walk-up fares from one station to another. */
+export async function loadFares(from: string, to: string): Promise<FareOption[]> {
+  const meta = await loadFaresMeta();
+  const codes = meta.locations[from] ?? [];
+  const files = new Map(await Promise.all(codes.map(async (c) => [c, await loadFareFile(c)] as const)));
+  return faresBetween(meta, files, from, to);
 }
 
 export const ukToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());

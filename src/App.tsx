@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Results } from './Results.tsx';
 import { StationInput } from './StationInput.tsx';
-import { loadDay, loadMeta, loadStations, ukToday } from './lib/data.ts';
+import { loadDay, loadFares, loadMeta, loadRestrictions, loadStations, ukToday } from './lib/data.ts';
+import type { FareOption, RestrictionSet } from './lib/fares.ts';
 import { findDirect, type DataMeta, type DirectJourney, type Station } from './lib/timetable.ts';
 
 interface Route {
@@ -34,11 +35,25 @@ function saveRecent(route: Route): Route[] {
   return list;
 }
 
+export interface RouteFares {
+  /** Tickets bought at the origin, for travelling out. */
+  out: FareOption[];
+  /** Returns bought at the destination, whose return half comes back this way. */
+  back: FareOption[];
+  sets: RestrictionSet[];
+}
+
+/** Fares are optional: without them the app still lists trains. */
+const loadRouteFares = (route: Route): Promise<RouteFares | null> =>
+  Promise.all([loadFares(route.from.crs, route.to.crs), loadFares(route.to.crs, route.from.crs), loadRestrictions()])
+    .then(([out, back, sets]) => ({ out, back: back.filter((f) => f.type.ret), sets }))
+    .catch(() => null);
+
 type Status =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'done'; route: Route; date: string; journeys: DirectJourney[] };
+  | { kind: 'done'; route: Route; date: string; journeys: DirectJourney[]; fares: RouteFares | null };
 
 export function App() {
   const [stations, setStations] = useState<Station[]>([]);
@@ -62,8 +77,9 @@ export function App() {
   const search = async (route: Route, day: string) => {
     setStatus({ kind: 'loading' });
     try {
-      const journeys = findDirect(await loadDay(day), route.from.crs, route.to.crs);
-      setStatus({ kind: 'done', route, date: day, journeys });
+      const [timetable, fares] = await Promise.all([loadDay(day), loadRouteFares(route)]);
+      const journeys = findDirect(timetable, route.from.crs, route.to.crs);
+      setStatus({ kind: 'done', route, date: day, journeys, fares });
       setRecent(saveRecent(route));
     } catch (err) {
       setStatus({ kind: 'error', message: (err as Error).message });
@@ -77,7 +93,7 @@ export function App() {
     <main>
       <header>
         <h1>Valid Trains Finder</h1>
-        <p class="lede">Find the trains between two stations.</p>
+        <p class="lede">Find which trains your ticket is valid on.</p>
       </header>
 
       {loadError && <p class="error">Could not load timetable data: {loadError}</p>}
@@ -147,14 +163,21 @@ export function App() {
 
       {status.kind === 'error' && <p class="error">{status.message}</p>}
       {status.kind === 'done' && (
-        <Results from={status.route.from} to={status.route.to} date={status.date} journeys={status.journeys} stations={stations} />
+        <Results
+          from={status.route.from}
+          to={status.route.to}
+          date={status.date}
+          journeys={status.journeys}
+          fares={status.fares}
+          stations={stations}
+        />
       )}
 
       <footer>
         <p>Contains data from National Rail Enquiries.</p>
         <p>
-          This is not an official National Rail service. Times are from the planned timetable and may change; always
-          check before you travel.
+          This is not an official National Rail service. Times are from the planned timetable and may change, and ticket
+          validity is worked out from published fares data; always check before you travel.
         </p>
         {meta && <p>Timetable data updated {new Date(meta.built).toLocaleDateString('en-GB')}.</p>}
       </footer>

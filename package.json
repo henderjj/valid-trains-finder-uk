@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "data:download": "tsx pipeline/download.ts",
     "data:build": "tsx pipeline/build.ts",
-    "data:inspect-fares": "tsx pipeline/inspect-fares.ts"
+    "data:check": "tsx pipeline/check-fares.ts"
   },
   "dependencies": {
     "preact": "^10.29.8"

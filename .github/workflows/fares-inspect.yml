@@ -1,14 +1,14 @@
-# Temporary Phase 2 spike: downloads the fares feed and prints its structure.
-name: Fares inspect
+# Temporary Phase 2 check: builds fares data from the live feeds and prints Long Eaton to
+# Sheffield validity for a weekday. Removed before the Phase 2 pull request is merged.
+name: Fares check
 
 on:
   workflow_dispatch:
   push:
     branches: [phase-2-validity]
-    paths: [pipeline/inspect-fares.ts, .github/workflows/fares-inspect.yml]
 
 jobs:
-  inspect:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -17,9 +17,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Download fares feed
-        run: npm run data:download -- fares
+      - name: Download feeds
+        run: npm run data:download -- timetable fares
         env:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
-      - run: npm run -s data:inspect-fares
+      - run: npm run data:build -- 2026-09-28 1
+      - run: du -sh public/data/fares && ls public/data/fares | wc -l && ls -S -l public/data/fares | head -6 && ls -l public/data/*.json
+      - run: npm run -s data:check -- LGE SHF
+      - run: npm run -s data:check -- SHF LGE
+      - run: npm run -s data:check -- KGX EDB 2>&1 | head -60

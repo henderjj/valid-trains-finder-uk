@@ -1,12 +1,16 @@
 // Builds the data files the app reads, into public/data/ (git-ignored):
-//   stations.json, meta.json and days/YYYY-MM-DD.json for each day in range.
+//   stations.json, meta.json and days/YYYY-MM-DD.json for each day in range, and, when the
+//   fares feed has been downloaded, fares-meta.json, restrictions.json and fares/<code>.json.
 // Usage: npm run data:build -- [startDate YYYY-MM-DD, default today in the UK] [days, default 28]
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { gzipSync } from 'node:zlib';
+import type { FaresMeta } from '../src/lib/fares.ts';
 import type { DataMeta } from '../src/lib/timetable.ts';
 import { CifParser, type CifFile } from './cif.ts';
+import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes } from './fares.ts';
 import { addDays, buildDay, buildStations, crsByTiploc } from './publish.ts';
 
 const OUT = 'public/data';
@@ -19,6 +23,44 @@ async function readTimetable(zip: string): Promise<CifFile> {
   const code: number = await new Promise((resolve) => unzip.on('close', resolve));
   if (code !== 0) throw new Error(`unzip exited with code ${code}`);
   return parser.result();
+}
+
+/** Lines of the fares zip member with this extension, without comment lines. */
+function faresMember(zip: string, ext: string): string[] {
+  const unzip = (...args: string[]) => execFileSync('unzip', args, { maxBuffer: 2 ** 30, encoding: 'latin1' });
+  const name = unzip('-Z1', zip)
+    .split('\n')
+    .find((n) => n.endsWith(`.${ext}`));
+  if (!name) throw new Error(`No .${ext} file in ${zip}`);
+  return unzip('-p', zip, name)
+    .split(/\r?\n/)
+    .filter((l) => l && !l.startsWith('/'));
+}
+
+/** Walk-up fares current on `date`, as one file per origin fare location code. */
+async function buildFares(zip: string, date: string) {
+  const tickets = parseTicketTypes(faresMember(zip, 'TTY'), date);
+  const { files, routes, restrictions } = parseFares(faresMember(zip, 'FFL'), tickets, date);
+  const meta: FaresMeta = {
+    locations: parseLocations(faresMember(zip, 'LOC'), faresMember(zip, 'FSC'), date),
+    tickets,
+    routes: parseRoutes(faresMember(zip, 'RTE'), routes, date),
+  };
+  await mkdir(`${OUT}/fares`, { recursive: true });
+  let raw = 0;
+  let gz = 0;
+  for (const [code, file] of files) {
+    const json = JSON.stringify(file);
+    raw += json.length;
+    gz += gzipSync(json).length;
+    await writeFile(`${OUT}/fares/${code}.json`, json);
+  }
+  await writeFile(`${OUT}/fares-meta.json`, JSON.stringify(meta));
+  await writeFile(`${OUT}/restrictions.json`, JSON.stringify(parseRestrictions(faresMember(zip, 'RST'), restrictions)));
+  console.log(
+    `Fares: ${Object.keys(tickets).length} ticket types, ${files.size} origin files, ${kb(raw)} raw, ${kb(gz)} gzip; ` +
+      `${Object.keys(meta.locations).length} stations, ${restrictions.size} restriction codes`,
+  );
 }
 
 const ukToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
@@ -50,6 +92,10 @@ async function main() {
   const meta: DataMeta = { built: new Date().toISOString(), from: start, to: addDays(start, days - 1) };
   await writeFile(`${OUT}/meta.json`, JSON.stringify(meta));
   console.log(`${stations.length} stations`);
+
+  const faresZip = 'data/raw/fares.zip';
+  if (existsSync(faresZip)) await buildFares(faresZip, start);
+  else console.log('No fares feed downloaded; skipping fares');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
