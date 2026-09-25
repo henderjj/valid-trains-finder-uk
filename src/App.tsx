@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Results } from './Results.tsx';
 import { StationInput } from './StationInput.tsx';
-import { loadFares, loadMeta, loadRestrictions, loadRouteing, loadStations, ukToday } from './lib/data.ts';
+import { loadFares, loadMeta, loadOperators, loadRestrictions, loadRouteing, loadStations, ukToday } from './lib/data.ts';
 import type { FareOption, RestrictionSet } from './lib/fares.ts';
+import { registerOperators } from './lib/operators.ts';
 import { planJourneysInBackground } from './lib/plan.ts';
 import type { Routeing } from './lib/routeing.ts';
 import type { DataMeta, Journey, Station } from './lib/timetable.ts';
@@ -90,8 +91,9 @@ export function App() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
   useEffect(() => {
-    Promise.all([loadStations(), loadMeta()])
-      .then(([s, m]) => {
+    Promise.all([loadStations(), loadMeta(), loadOperators()])
+      .then(([s, m, operators]) => {
+        registerOperators(operators);
         setStations(s);
         setMeta(m);
       })

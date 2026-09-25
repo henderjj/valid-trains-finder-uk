@@ -1,19 +1,24 @@
 // Builds the data files the app reads, into public/data/ (git-ignored):
 //   stations.json, meta.json and days/YYYY-MM-DD.json for each day in range, and, when the
-//   fares feed has been downloaded, fares-meta.json, restrictions.json and fares/<code>.json,
+//   fares feed has been downloaded, fares-meta.json, restrictions.json, operators.json and fares/<code>.json,
 //   and when the routeing guide has, routeing.json and routeing/<routeing point>.json.
+// It then checks the data looks complete (pipeline/checks.ts) and fails if not, so a broken
+// feed is never published. Set DATA_CHECKS=warn to build from partial or sample feeds.
 // Usage: npm run data:build -- [startDate YYYY-MM-DD, default today in the UK] [days, default 84]
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { gzipSync } from 'node:zlib';
 import type { FaresMeta } from '../src/lib/fares.ts';
 import type { DataMeta } from '../src/lib/timetable.ts';
 import { CifParser, parseChangeTimes, type CifFile } from './cif.ts';
-import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities } from './fares.ts';
+import { routeOperators } from '../src/lib/fares.ts';
+import { operatorName, registerOperators } from '../src/lib/operators.ts';
+import { annotations, checkData, summary, type BuildSummary } from './checks.ts';
+import { parseFares, parseLocations, parseOperators, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities } from './fares.ts';
 import { parsePermittedRoutes, parseRouteing } from './routeing.ts';
-import { addDays, buildDay, buildStations, crsByTiploc } from './publish.ts';
+import { addDays, buildDay, buildStations, crsByTiploc, titleCase } from './publish.ts';
 
 const OUT = 'public/data';
 
@@ -39,9 +44,23 @@ function member(zip: string, ext: string): string[] {
     .filter((l) => l && !l.startsWith('/'));
 }
 
+/** Like member(), but an empty list (and a note) when the feed has no such file. */
+function optionalMember(zip: string, ext: string): string[] {
+  try {
+    return member(zip, ext);
+  } catch (err) {
+    console.log(`${(err as Error).message}; carrying on without it`);
+    return [];
+  }
+}
+
 /** Walk-up fares current on `date`, as one file per origin fare location code. */
-async function buildFares(zip: string, date: string) {
-  const tickets = parseTicketTypes(member(zip, 'TTY'), date, parseValidities(member(zip, 'TVL'), date));
+async function buildFares(zip: string, date: string): Promise<{ summary: NonNullable<BuildSummary['fares']>; routes: Record<string, string> }> {
+  // Operator names first, so route descriptions naming a new operator can be read.
+  const operators = parseOperators(optionalMember(zip, 'TOC'), titleCase);
+  registerOperators(operators);
+  await writeFile(`${OUT}/operators.json`, JSON.stringify(operators));
+  const tickets = parseTicketTypes(member(zip, 'TTY'), date, parseValidities(optionalMember(zip, 'TVL'), date));
   const { files, routes, restrictions } = parseFares(member(zip, 'FFL'), tickets, date);
   const meta: FaresMeta = {
     locations: parseLocations(member(zip, 'LOC'), member(zip, 'FSC'), date),
@@ -61,11 +80,15 @@ async function buildFares(zip: string, date: string) {
   await writeFile(`${OUT}/restrictions.json`, JSON.stringify(parseRestrictions(member(zip, 'RST'), restrictions)));
   console.log(
     `Fares: ${Object.keys(tickets).length} ticket types (${Object.values(tickets).filter((t) => t.valid).length} with validity), ${files.size} origin files, ${kb(raw)} raw, ${kb(gz)} gzip; ` +
-      `${Object.keys(meta.locations).length} stations, ${restrictions.size} restriction codes`,
+      `${Object.keys(meta.locations).length} stations, ${restrictions.size} restriction codes, ${Object.keys(operators).length} operator names`,
   );
+  return {
+    summary: { ticketTypes: Object.keys(tickets), originFiles: files.size, restrictionCodes: restrictions.size },
+    routes: meta.routes,
+  };
 }
 
-async function buildRouteing(zip: string) {
+async function buildRouteing(zip: string): Promise<{ summary: NonNullable<BuildSummary['routeing']>; fareRoutes: Set<string> }> {
   const data = parseRouteing({
     stations: member(zip, 'RGS'),
     groups: member(zip, 'RGG'),
@@ -92,6 +115,10 @@ async function buildRouteing(zip: string) {
       `${Object.keys(data.fareRoutes).length} fare routes, London group ${data.london}, ` +
       `${kb(json.length)} (${kb(gzipSync(json).length)} gzip); ${routes.size} route files, ${kb(gz)} gzip`,
   );
+  return {
+    summary: { points: data.points.length, fareRoutes: Object.keys(data.fareRoutes).length },
+    fareRoutes: new Set(Object.keys(data.fareRoutes)),
+  };
 }
 
 const ukToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
@@ -107,24 +134,25 @@ async function main() {
   await mkdir(`${OUT}/days`, { recursive: true });
   const crsOf = crsByTiploc(cif);
   const served = new Set<string>();
+  const operators = new Set<string>();
+  const dayCounts: BuildSummary['days'] = [];
 
   console.log('date        trains     raw      gzip');
   for (let d = 0; d < days; d++) {
     const date = addDays(start, d);
     const day = buildDay(cif, date, crsOf);
-    for (const t of day.trains) for (let i = 0; i < t.c.length; i += 3) served.add(t.c[i] as string);
+    for (const t of day.trains) {
+      operators.add(t.o);
+      for (let i = 0; i < t.c.length; i += 3) served.add(t.c[i] as string);
+    }
+    dayCounts.push({ date, trains: day.trains.length });
     const json = JSON.stringify(day);
     await writeFile(`${OUT}/days/${date}.json`, json);
     console.log(`${date}  ${String(day.trains.length).padStart(6)}  ${kb(json.length).padStart(7)}  ${kb(gzipSync(json).length).padStart(7)}`);
   }
 
   // Stations without a minimum connection time use the planner's default.
-  let changeTimes = new Map<string, number>();
-  try {
-    changeTimes = parseChangeTimes(member('data/raw/timetable.zip', 'MSN'));
-  } catch (err) {
-    console.log(`No station change times: ${(err as Error).message}`);
-  }
+  const changeTimes = parseChangeTimes(optionalMember('data/raw/timetable.zip', 'MSN'));
   const stations = buildStations(cif, served, changeTimes);
   await writeFile(`${OUT}/stations.json`, JSON.stringify(stations));
   const unusual = stations.filter((s) => s.change !== undefined && (s.change < 2 || s.change > 15));
@@ -134,12 +162,34 @@ async function main() {
   console.log(`${stations.length} stations`);
 
   const faresZip = 'data/raw/fares.zip';
-  if (existsSync(faresZip)) await buildFares(faresZip, start);
-  else console.log('No fares feed downloaded; skipping fares');
+  const fares = existsSync(faresZip) ? await buildFares(faresZip, start) : undefined;
+  if (!fares) console.log('No fares feed downloaded; skipping fares');
 
   const routeingZip = 'data/raw/routeing.zip';
-  if (existsSync(routeingZip)) await buildRouteing(routeingZip);
-  else console.log('No routeing guide downloaded; skipping routeing');
+  const routeing = existsSync(routeingZip) ? await buildRouteing(routeingZip) : undefined;
+  if (!routeing) console.log('No routeing guide downloaded; skipping routeing');
+
+  // Routes that limit operators in words the app can't read, and that the routeing guide
+  // has no data for, can't be checked at all. A few name no train operator at all: fares
+  // not for travel, and West Midlands Metro trams, which aren't in the rail timetable.
+  const noOperator = /^(?:NOT FOR TRAVEL|DO NOT USE|NOT TO BE USED|MID METRO ONLY)$/;
+  const unreadableRoutes = Object.entries(fares?.routes ?? {})
+    .filter(([code, desc]) => routeOperators(desc).unread && !routeing?.fareRoutes.has(code) && !noOperator.test(desc.trim()))
+    .map(([code, desc]) => `${desc} (${code})`);
+  const result = checkData({
+    days: dayCounts,
+    stations: stations.length,
+    changeTimes: changeTimes.size,
+    fares: fares?.summary,
+    routeing: routeing?.summary,
+    unnamedOperators: [...operators].filter((o) => operatorName(o) === o).sort(),
+    unreadableRoutes,
+  });
+  for (const line of annotations(result)) console.log(line);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary(result));
+  if (result.errors.length && process.env.DATA_CHECKS !== 'warn') {
+    throw new Error(`${result.errors.length} data check(s) failed, so this data won't be published`);
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

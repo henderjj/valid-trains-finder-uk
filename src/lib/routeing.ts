@@ -239,6 +239,11 @@ export class Routeing {
    * its route description requires or excludes. A fare routed via a place is also valid when
    * each part of the journey, split there, is on a permitted route.
    */
+  /** Whether the routeing guide has place or operator data for a fare route. */
+  hasFareRoute(route: string): boolean {
+    return route in this.data.fareRoutes;
+  }
+
   checkFare(journey: Journey, route: string): RouteCheck {
     const r = this.data.fareRoutes[route];
     const path = r ? this.trace(journey) : null;

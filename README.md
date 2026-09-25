@@ -28,4 +28,4 @@ npm run dev                          # the app now reads the local data
 
 ## Deployment
 
-The **Deploy** workflow runs on every push to `main` (and by hand from the Actions tab). It also runs every Monday at 03:30 UTC. It downloads the timetable, fares and routeing guide, builds 12 weeks (84 days) of data plus the app, and publishes both to GitHub Pages. Pages must be enabled once under **Settings → Pages → Source: GitHub Actions**.
+The **Deploy** workflow runs on every push to `main` (and by hand from the Actions tab). It also runs every Monday at 03:30 UTC. It downloads the timetable, fares and routeing guide, builds 12 weeks (84 days) of data plus the app, checks the data looks complete, and publishes both to GitHub Pages. If a check fails the run fails and the site keeps its last good data; warnings (such as an operator with no name) show on the run's page. Pages must be enabled once under **Settings → Pages → Source: GitHub Actions**.
