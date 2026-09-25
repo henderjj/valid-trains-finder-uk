@@ -1,12 +1,8 @@
-# Temporary spike: prints feed structure for connection times, platforms and ticket rules.
+# Temporary check: real-data results for change times, platforms and ticket rules.
 set -u
-m() { unzip -p data/raw/$1.zip "*.$2"; }
-echo "== MSN long change times"; m timetable MSN | grep -E '^A' | awk '{ t=substr($0,64,2)+0; if (t>=15 || t<=2) print }' | head -80
-echo "== MSN non-A samples"; m timetable MSN | grep -E '^[LZEM0-]' | head -12
-echo "== RRH samples"; m fares RST | grep -E '^RRH' | head -6 | cat -A | cut -c1-240
-echo "== RRH columns 136+"; m fares RST | grep -E '^RRHC' | cut -c137-160 | sort | uniq -c | sort -rn | head -20
-echo "== RRH line lengths"; m fares RST | grep -E '^RRHC' | awk '{print length($0)}' | sort | uniq -c
-echo "== RRR samples"; m fares RST | grep -E '^RRRC' | head -8
-echo "== RCA/REC samples"; m fares RST | grep -E '^RECC' | head -5
-echo "== walk-up TTY validity codes"; m fares TTY | grep -E '^R' | awk '{ d=substr($0,29,15); v=substr($0,77,2); if (d ~ /ANYTIME|OFF-PEAK|OFF PEAK|SUP OFF|SUPER OFF|OFFPEAK/ && d !~ /ADVANCE|SEASON|GROUP|CARNET|FLEXI|TEST/) print v, d }' | sort | uniq -c | sort -rn | head -60
-echo "== TVL for those codes"; m fares TVL | grep -E '^(72|85|88|41|40|87|81|13|10|11|12|20|28|03)'
+D=public/data
+node -e "const s=require('./$D/stations.json'); for (const c of ['LGE','DBY','MAN','CLJ','BHM','KGX','YRK','CRE','RDG','EDB']) console.log(JSON.stringify(s.find(x=>x.crs===c)))"
+node -e "const t=require('./$D/fares-meta.json').tickets; for (const [k,v] of Object.entries(t)) if (['SOR','SVR','CDR','SOS','SVS','CDS','SSR','SSS','OPR','OPS','GPR','GPS','FOR','FSR'].includes(k)) console.log(k, JSON.stringify(v))"
+node -e "const d=require('./$D/days/2026-09-28.json'); const w=d.trains.filter(t=>t.p).length; console.log('trains with platforms', w, 'of', d.trains.length)"
+ls -la $D/days | head -4; du -sh $D/days
+for r in "LGE SHF" "LGE MAN" "NRW BHM" "KGX EDB"; do echo "=== $r"; npm run -s data:check -- $r 2026-09-29 | grep -vE '^\s+[0-9]{2}:[0-9]{2}-.*(valid|NOT valid)' | head -60; done

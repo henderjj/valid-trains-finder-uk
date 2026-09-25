@@ -1,5 +1,5 @@
-# Temporary spike: downloads the timetable and fares feeds and prints the parts needed for
-# connection times, platforms and ticket rules.
+# Temporary check: builds a week of real data and prints change times, platforms and
+# ticket rules for a few routes.
 name: Feed inspect
 
 on:
@@ -16,9 +16,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Download timetable and fares feeds
-        run: npm run data:download -- timetable fares
+      - name: Download feeds
+        run: npm run data:download -- timetable fares routeing
         env:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
+      - run: npm run data:build -- 2026-09-28 7
       - run: bash pipeline/inspect-feeds.sh

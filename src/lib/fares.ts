@@ -12,6 +12,21 @@ export interface TicketType {
   /** 1 first class, 2 standard. */
   cls: 1 | 2;
   ret: boolean;
+  /** How long the ticket lasts and whether it allows a break of journey, when the feed says. */
+  valid?: TicketValidity;
+}
+
+/** A ticket's validity, from the fares feed's ticket validity file (.TVL). */
+export interface TicketValidity {
+  /** Days and months the outward portion can be used on, counting the date on the ticket. */
+  out: [number, number];
+  /** Days and months after the outward date that the return portion can be used by. */
+  ret: [number, number];
+  /** Days and months before the return can be used, and a weekday (MO to SU) it can't be used before. */
+  after: [number, number, string];
+  /** Whether a break of journey is allowed on the outward and return portions. */
+  breakOut: boolean;
+  breakRtn: boolean;
 }
 
 /** fares/<code>.json: destination code -> [route, ticket code, pence, restriction code]. */
@@ -240,6 +255,78 @@ export function checkValidity(
     }
   }
   return { valid: true };
+}
+
+const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** The same day of the month, `n` months later, or the month's last day when it is shorter. */
+function addMonths(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + n, Math.min(d, last), 12)).toISOString().slice(0, 10);
+}
+
+const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * The first and last dates the return portion of a return ticket can be used, for an
+ * outward journey on `outDate`, or null when the feed gives no return period. A period in
+ * months ends the day before the same date that many months later.
+ */
+export function returnWindow(v: TicketValidity, outDate: string): { first: string; last: string } | null {
+  const [days, months] = v.ret;
+  if (!days && !months) return null;
+  const last = months ? addDays(addMonths(outDate, months), days - 1) : addDays(outDate, days - 1);
+  let first = addDays(addMonths(outDate, v.after[1]), v.after[0]);
+  const weekday = WEEKDAYS.indexOf(v.after[2]);
+  if (weekday >= 0) while (new Date(`${first}T12:00:00Z`).getUTCDay() !== weekday) first = addDays(first, 1);
+  return { first, last };
+}
+
+const dayName = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** Whether the return half of a return ticket can be used on `backDate` after going out on `outDate`. */
+export function checkReturnDate(type: TicketType, outDate: string, backDate: string): Validity {
+  const window = type.valid && returnWindow(type.valid, outDate);
+  if (!window) return { valid: true };
+  if (backDate > window.last) {
+    const when = window.last === outDate ? 'on the day of the outward journey' : `by ${dayName(window.last)}`;
+    return { valid: false, reason: `Not valid: the return half must be used ${when}` };
+  }
+  if (backDate < window.first) return { valid: false, reason: `Not valid: the return half can't be used before ${dayName(window.first)}` };
+  return { valid: true };
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** The ticket's return period and break of journey rules in words, e.g. "Return within 1 month. Break of journey allowed." */
+export function describeTicketRules(type: TicketType): string {
+  const v = type.valid;
+  if (!v) return '';
+  const parts: string[] = [];
+  if (type.ret) {
+    const [days, months] = v.ret;
+    let ret = '';
+    if (months) ret = `Return within ${plural(months, 'month')}`;
+    else if (days === 1) ret = 'Return the same day';
+    else if (days) ret = `Return within ${plural(days, 'day')}, counting the outward day`;
+    const weekday = WEEKDAYS.indexOf(v.after[2]);
+    if (ret && weekday >= 0) ret += `, not before ${WEEKDAY_NAMES[weekday]}`;
+    else if (ret && v.after[0] === 1 && !v.after[1]) ret += ', but not on the outward day';
+    else if (ret && (v.after[0] || v.after[1])) {
+      const wait = [v.after[1] ? plural(v.after[1], 'month') : '', v.after[0] ? plural(v.after[0], 'day') : ''].filter(Boolean).join(' and ');
+      ret += `, from ${wait} after the outward day`;
+    }
+    if (ret) parts.push(`${ret}.`);
+  }
+  const breakOut = v.breakOut;
+  const breakRtn = type.ret ? v.breakRtn : breakOut;
+  if (breakOut && breakRtn) parts.push('Break of journey allowed.');
+  else if (!breakOut && !breakRtn) parts.push('No break of journey.');
+  else parts.push(`Break of journey allowed on the ${breakOut ? 'outward' : 'return'} journey only.`);
+  return parts.join(' ');
 }
 
 /**

@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, ticketKind } from '../pipeline/fares.ts';
-import { checkValidity, fareValidity, faresBetween, restrictionSetFor, routeOperators, type FaresMeta } from '../src/lib/fares.ts';
+import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities, ticketKind } from '../pipeline/fares.ts';
+import {
+  checkReturnDate,
+  checkValidity,
+  describeTicketRules,
+  fareValidity,
+  faresBetween,
+  restrictionSetFor,
+  returnWindow,
+  routeOperators,
+  type FaresMeta,
+  type TicketType,
+} from '../src/lib/fares.ts';
 import type { Journey, Leg } from '../src/lib/timetable.ts';
 
 /** Builds a fixed-width record from [position, value] pairs. */
@@ -185,5 +196,61 @@ describe('journeys with changes', () => {
       valid: false,
       reason: 'Not valid: this ticket is East Midlands Railway only (the 09:10 is Northern)',
     });
+  });
+});
+
+describe('ticket validity periods', () => {
+  // Real .TVL records: an Off-Peak Return (1 day out, 1 month back), an Off-Peak Day Return,
+  // a single with no break of journey on the way out, and a return from the day after.
+  const tvl = [
+    '723112299919122000AS ADVERTISED       010000010000  YYAS ADVERTISED AS ADVERTISED ',
+    '853112299919122000SEE RESTRICTNS      010001000000  YYSEE RESTRICTNSSEE RESTRICTNS',
+    '883112299919122000SEE RESTRICTNS      010000000000  NNSEE RESTRICTNSINVALID       ',
+    '293112299912012023OUTDAY1 RTNDAY2     010002000100  NNON DATE SHOWN BEFORE 1200   ',
+    '583112299929092022WKND 4 Days         010004000000SUNYOne Day       Four Days     ',
+    '863112299919032026OUT1DAY RTN5DYS     010005000000  NNBOOKDTRAINONLYFIVE DAYS     ',
+    '861803202613032026OUT1DAY RTN5DYS     010005000000  NYBOOKDTRAINONLYFIVE DAYS     ',
+  ];
+  const v = parseValidities(tvl, DATE);
+  const type = (code: string, ret = true): TicketType => ({ name: 'T', kind: 'offpeak', cls: 2, ret, valid: v.get(code) });
+
+  it('reads the periods current on the date', () => {
+    expect(v.get('72')).toEqual({ out: [1, 0], ret: [0, 1], after: [0, 0, ''], breakOut: true, breakRtn: true });
+    expect(v.get('58')?.after).toEqual([0, 0, 'SU']);
+    expect(v.get('86')?.breakRtn).toBe(false);
+  });
+
+  it('attaches them to ticket types by validity code', () => {
+    const line = rec([0, 'RSVR'], [4, OPEN], [12, '22052017'], [28, 'OFF-PEAK R'], [43, '2RS'], [75, '72']);
+    expect(parseTicketTypes([line], DATE, v).SVR.valid).toEqual(v.get('72'));
+  });
+
+  it('works out the return window', () => {
+    expect(returnWindow(v.get('72')!, '2026-10-05')).toEqual({ first: '2026-10-05', last: '2026-11-04' });
+    expect(returnWindow(v.get('72')!, '2026-01-31')).toEqual({ first: '2026-01-31', last: '2026-02-27' });
+    expect(returnWindow(v.get('85')!, '2026-10-05')).toEqual({ first: '2026-10-05', last: '2026-10-05' });
+    expect(returnWindow(v.get('29')!, '2026-10-05')).toEqual({ first: '2026-10-06', last: '2026-10-06' });
+    // Out on a Friday; back from Sunday, within four days.
+    expect(returnWindow(v.get('58')!, '2026-10-09')).toEqual({ first: '2026-10-11', last: '2026-10-12' });
+    expect(returnWindow(v.get('88')!, '2026-10-05')).toBeNull();
+  });
+
+  it('checks the return date', () => {
+    expect(checkReturnDate(type('85'), '2026-10-05', '2026-10-05')).toEqual({ valid: true });
+    expect(checkReturnDate(type('85'), '2026-10-05', '2026-10-06')).toEqual({
+      valid: false,
+      reason: 'Not valid: the return half must be used on the day of the outward journey',
+    });
+    expect(checkReturnDate(type('72'), '2026-10-05', '2026-11-05').reason).toBe('Not valid: the return half must be used by Wed 4 Nov');
+    expect(checkReturnDate(type('29'), '2026-10-05', '2026-10-05').reason).toBe("Not valid: the return half can't be used before Tue 6 Oct");
+    expect(checkReturnDate({ ...type('72'), valid: undefined }, '2026-10-05', '2027-01-01')).toEqual({ valid: true });
+  });
+
+  it('describes the rules', () => {
+    expect(describeTicketRules(type('72'))).toBe('Return within 1 month. Break of journey allowed.');
+    expect(describeTicketRules(type('85'))).toBe('Return the same day. Break of journey allowed.');
+    expect(describeTicketRules(type('88', false))).toBe('No break of journey.');
+    expect(describeTicketRules(type('29'))).toBe('Return within 2 days, counting the outward day, but not on the outward day. No break of journey.');
+    expect(describeTicketRules(type('58'))).toBe('Return within 4 days, counting the outward day, not before Sunday. Break of journey allowed on the return journey only.');
   });
 });

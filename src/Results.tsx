@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { RouteFares, Trip } from './App.tsx';
 import { ukToday } from './lib/data.ts';
-import { fareValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
+import { checkReturnDate, describeTicketRules, fareValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
 import { operatorName } from './lib/operators.ts';
 import { clock, duration, type Journey, type Station } from './lib/timetable.ts';
 
@@ -69,15 +69,18 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
   const validity = useMemo(() => {
     const map = new Map<Journey, Validity>();
     if (!ticket || !fares) return map;
+    // The return half of a return ticket only lasts so long after the outward journey.
+    const period = half && checkReturnDate(half.type, date, day);
     const set = restrictionSetFor(fares.sets, day);
-    for (const j of pool) map.set(j, fareValidity(j, ticket, set, day, dir, name, fares.routeing ?? undefined));
+    for (const j of pool) map.set(j, period && !period.valid ? period : fareValidity(j, ticket, set, day, dir, name, fares.routeing ?? undefined));
     return map;
-  }, [ticket, fares, pool, day, dir, names]);
+  }, [ticket, half, fares, pool, date, day, dir, names]);
 
   const validCount = [...validity.values()].filter((v) => v.valid).length;
   const shown = ticket && validOnly ? pool.filter((j) => validity.get(j)?.valid) : pool;
   const restriction = ticket?.restriction ? restrictionSetFor(fares?.sets ?? [], day)?.restrictions[ticket.restriction] : undefined;
   const restrictionText = restriction && (dir === 'O' ? restriction.out : restriction.rtn || restriction.out);
+  const rules = ticket ? describeTicketRules(ticket.type) : '';
 
   const today = day === ukToday();
   const kind = directOnly ? 'direct ' : '';
@@ -155,6 +158,7 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
           {ticket && (
             <>
               <p class="hint">{restrictionText ? restrictionText : 'No time restrictions: valid on any train on this route.'}</p>
+              {rules && <p class="hint">{rules}</p>}
               <label class="check">
                 <input type="checkbox" checked={validOnly} onChange={(e) => setValidOnly((e.currentTarget as HTMLInputElement).checked)} />
                 Show valid trains only
