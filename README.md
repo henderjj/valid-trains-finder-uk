@@ -36,6 +36,6 @@ be committed (`specs/` and `*.pdf` are ignored).
 
 The **Deploy** workflow runs on every push to `main` (and by hand from the Actions tab).
 It also runs every Monday at 03:30 UTC. It downloads the timetable, fares and routeing
-guide, builds 28 days of data plus the app, and publishes both to
+guide, builds 12 weeks (84 days) of data plus the app, and publishes both to
 GitHub Pages. Pages must be enabled once under **Settings → Pages → Source: GitHub
 Actions**.

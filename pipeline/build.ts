@@ -2,7 +2,7 @@
 //   stations.json, meta.json and days/YYYY-MM-DD.json for each day in range, and, when the
 //   fares feed has been downloaded, fares-meta.json, restrictions.json and fares/<code>.json,
 //   and when the routeing guide has, routeing.json and routeing/<routeing point>.json.
-// Usage: npm run data:build -- [startDate YYYY-MM-DD, default today in the UK] [days, default 28]
+// Usage: npm run data:build -- [startDate YYYY-MM-DD, default today in the UK] [days, default 84]
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -99,7 +99,7 @@ const kb = (n: number) => `${(n / 1024).toFixed(0)} KB`;
 
 async function main() {
   const start = process.argv[2] || ukToday();
-  const days = Number(process.argv[3] || 28);
+  const days = Number(process.argv[3] || 84);
   const cif = await readTimetable('data/raw/timetable.zip');
   console.log(`Parsed ${cif.schedules.length} schedules, ${cif.tiplocs.size} TIPLOCs`);
 

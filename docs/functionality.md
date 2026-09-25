@@ -41,8 +41,11 @@ also works offline.
 ### Date
 
 - **Date** defaults to today (UK time).
-- Only dates that have timetable data can be searched. This is 28 days from when the
-  data was last built. Outside that range, the app says which dates are available.
+- Only dates that have timetable data can be searched. This is 12 weeks (84 days) from
+  when the data was last built. With weekly builds, that means at least 11 weeks ahead.
+  Outside that range, the app says which dates are available.
+- Dates further ahead show the planned timetable. Engineering-work changes are usually
+  published about 12 weeks ahead, so times may still change for the furthest dates.
 - **Find trains** is enabled once both stations are chosen, they are different, and the
   date is in range.
 
