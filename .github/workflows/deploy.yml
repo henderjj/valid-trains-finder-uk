@@ -1,6 +1,6 @@
 # Builds the timetable and fares data and the app together and publishes them to GitHub
 # Pages, so the app and its data always match. The weekly run refreshes the data, which
-# covers the 28 days from the day it is built.
+# covers the 84 days (12 weeks) from the day it is built.
 name: Deploy
 
 on:
@@ -13,7 +13,7 @@ on:
     inputs:
       days:
         description: Number of days of timetable to publish
-        default: '28'
+        default: '84'
 
 permissions:
   contents: read
@@ -41,7 +41,7 @@ jobs:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
       - name: Build timetable, fares and routeing data
-        run: npm run data:build -- "" "${{ inputs.days || '28' }}"
+        run: npm run data:build -- "" "${{ inputs.days || '84' }}"
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
         with:
