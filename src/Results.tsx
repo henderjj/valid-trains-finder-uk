@@ -30,7 +30,7 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const [leg, setLeg] = useState<Leg>('O');
   const [picked, setPicked] = useState(lastTicket);
-  const [validOnly, setValidOnly] = useState(false);
+  const [validOnly, setValidOnly] = useState(true);
   const names = useMemo(() => new Map(stations.map((s) => [s.crs, s.name])), [stations]);
   const name = (crs: string) => names.get(crs) ?? crs;
 
@@ -108,6 +108,9 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
       )}
 
       {journeys.length === 0 && <p>Journeys with changes are coming in a later version.</p>}
+      {journeys.length > 0 && shown.length === 0 && (
+        <p>None of the direct trains are valid with this ticket. Untick "Show valid trains only" to see them all.</p>
+      )}
       <ol class="journeys">
         {shown.map((j) => {
           const key = `${j.uid}-${j.dep}`;
