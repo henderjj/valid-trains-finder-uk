@@ -55,6 +55,16 @@ export interface DirectJourney {
   calls: Stop[];
 }
 
+/** One train ridden from boarding to alighting. */
+export type Leg = DirectJourney;
+
+/** A journey of one or more trains, changing between them. */
+export interface Journey {
+  legs: Leg[];
+  dep: number;
+  arr: number;
+}
+
 export function callsOf(train: DayTrain): Stop[] {
   const out: Stop[] = [];
   for (let i = 0; i < train.c.length; i += 3) {
