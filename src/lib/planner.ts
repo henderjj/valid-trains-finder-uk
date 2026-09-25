@@ -8,8 +8,10 @@ export type { Journey, Leg };
 export interface PlanOptions {
   /** Most trains in one journey. */
   maxLegs?: number;
-  /** Minutes allowed to change trains at a station. */
+  /** Minutes allowed to change trains at a station without its own minimum connection time. */
   changeTime?: number;
+  /** Minimum connection time in minutes at particular stations, by CRS code. */
+  changeTimes?: Record<string, number>;
   /** Longest journey considered, in minutes. */
   maxDuration?: number;
 }
@@ -88,9 +90,9 @@ function firstFrom(dep: Int32Array, t: number): number {
  * among those arriving earliest, or null when there is none.
  */
 function earliest(net: Network, from: number, to: number, after: number, opts: Required<PlanOptions>, scratch: Scratch): Journey | null {
-  const { maxLegs, changeTime, maxDuration } = opts;
+  const { maxLegs, maxDuration } = opts;
   const n = net.stations.size;
-  const { best, board, via } = scratch;
+  const { best, board, via, change } = scratch;
   best.fill(NONE);
   board.fill(-1);
   // best[k * n + s]: earliest arrival at s using exactly k trains; k = 0 is the origin itself.
@@ -107,7 +109,7 @@ function earliest(net: Network, from: number, to: number, after: number, opts: R
     const riding = board[t * 2] === -1 ? maxLegs : board[t * 2 + 1] - 1;
     for (let k = 0; k < riding; k++) {
       const ready = best[k * n + s];
-      if (ready !== NONE && ready + (k === 0 ? 0 : changeTime) <= dep) {
+      if (ready !== NONE && ready + (k === 0 ? 0 : change[s]) <= dep) {
         board[t * 2] = c;
         board[t * 2 + 1] = k + 1;
         break;
@@ -154,9 +156,11 @@ interface Scratch {
   best: Int32Array;
   board: Int32Array;
   via: Int32Array;
+  /** Minutes needed to change trains at each station. */
+  change: Int32Array;
 }
 
-const DEFAULTS: Required<PlanOptions> = { maxLegs: 3, changeTime: 5, maxDuration: 12 * 60 };
+const DEFAULTS: Required<PlanOptions> = { maxLegs: 3, changeTime: 5, changeTimes: {}, maxDuration: 12 * 60 };
 
 /**
  * Journeys from one station to another leaving on the network's day (00:00 to 23:59): every
@@ -176,7 +180,12 @@ export function planJourneys(net: Network, day: DayFile, fromCrs: string, toCrs:
     best: new Int32Array((opts.maxLegs + 1) * n),
     board: new Int32Array(net.trains.length * 2),
     via: new Int32Array((opts.maxLegs + 1) * n * 2),
+    change: new Int32Array(n).fill(opts.changeTime),
   };
+  for (const [crs, i] of net.stations) {
+    const minutes = opts.changeTimes[crs];
+    if (minutes !== undefined) scratch.change[i] = minutes;
+  }
   const found: Journey[] = [];
   for (let after = 0; after < 1440; ) {
     const j = earliest(net, from, to, after, opts, scratch);
