@@ -162,18 +162,20 @@ const inWindow = (t: number, w: TimeWindow) => {
 /**
  * Operator limits read from a route description: "LNER ONLY" allows only those operators,
  * "NOT LNER" excludes them. Other routes (via a station, avoiding one) are checked with the
- * routeing guide's route data.
+ * routeing guide's route data. `unread` marks an "ONLY" or "NOT" description whose names
+ * aren't known operators: a place, or an operator the app doesn't know yet.
  */
-export function routeOperators(desc: string): { only?: string[]; not?: string[] } {
+export function routeOperators(desc: string): { only?: string[]; not?: string[]; unread?: true } {
   // Descriptions are 16 characters and sometimes end in a full stop or a bracketed code.
   const d = desc
     .toUpperCase()
     .replace(/\(.*?\)|\.+\s*$/g, '')
     .trim();
-  const only = /^(.+?)\s+ONLY$/.exec(d);
-  if (only) return { only: operatorsNamed(only[1]) ?? undefined };
+  const only = /^(.+?)[\s-]+ONLY$/.exec(d);
   const not = /^(?:NOT|EXCL?\.?|EXCLUDING)\s+(.+)$/.exec(d);
-  if (not) return { not: operatorsNamed(not[1]) ?? undefined };
+  const named = (only ?? not) && operatorsNamed((only ?? not)![1]);
+  if (only) return named ? { only: named } : { unread: true };
+  if (not) return named ? { not: named } : { unread: true };
   return {};
 }
 
@@ -344,6 +346,8 @@ export function fareValidity(
 ): Validity {
   const route = checkRoute(journey, fare.routeName);
   if (!route.valid) return route;
+  // A route naming operators the app can't read, with no routeing guide data to check it by.
+  const unchecked = routeOperators(fare.routeName).unread && !routeing?.hasFareRoute(fare.route);
   const routed = routeing?.checkFare(journey, fare.route);
   if (routed?.permitted === false) {
     if (routed.byFareRoute || journey.legs.length === 1) {
@@ -352,5 +356,9 @@ export function fareValidity(
     const via = journey.legs.slice(1).map((l) => names(l.calls[0].crs));
     return { valid: false, reason: `Not valid: changing at ${via.join(' and ')} is not a permitted route for this ticket` };
   }
-  return checkValidity(journey, fare.restriction, set, date, dir, names);
+  const result = checkValidity(journey, fare.restriction, set, date, dir, names);
+  if (result.valid && unchecked && !result.reason) {
+    return { valid: true, reason: `The app can't check this ticket's route (${fare.routeName.trim()}); check before you travel` };
+  }
+  return result;
 }

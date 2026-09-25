@@ -16,8 +16,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Download feeds
-        run: npm run data:download -- timetable fares
+        run: npm run data:download -- timetable fares routeing
         env:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
+      - run: npm run data:build -- 2026-12-20 14
       - run: bash pipeline/inspect-feeds.sh

@@ -231,3 +231,22 @@ export function parseRestrictions(lines: Iterable<string>, used: Set<string>): R
 }
 
 export type { FaresMeta };
+
+/**
+ * Operator names by timetable code from the operator file (.TOC): "T" records hold the
+ * two-letter code, the name and, last, whether the operator is active (Y/N).
+ */
+export function parseOperators(lines: Iterable<string>, titleCase: (name: string) => string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const active = new Set<string>();
+  for (const l of lines) {
+    const m = /^T([A-Z0-9]{2})(.*?)\s+([YN])\s*$/.exec(l);
+    if (!m || !m[2].trim()) continue;
+    const [, code, name, flag] = m;
+    // Prefer an active operator's name when a code has been reused.
+    if (active.has(code)) continue;
+    out[code] = titleCase(name.trim());
+    if (flag === 'Y') active.add(code);
+  }
+  return out;
+}

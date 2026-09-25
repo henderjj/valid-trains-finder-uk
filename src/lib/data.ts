@@ -14,6 +14,8 @@ async function getJson<T>(path: string): Promise<T> {
 
 export const loadMeta = () => getJson<DataMeta>('meta.json');
 export const loadStations = () => getJson<Station[]>('stations.json');
+/** Operator names from the fares feed, by timetable code; empty when not published. */
+export const loadOperators = () => getJson<Record<string, string>>('operators.json').catch(() => ({}));
 
 const days = new Map<string, Promise<DayFile>>();
 export function loadDay(date: string): Promise<DayFile> {

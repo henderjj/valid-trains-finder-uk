@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describeTicketRules, fareValidity, faresBetween, restrictionSetFor, type FareFile, type FaresMeta, type RestrictionSet } from '../src/lib/fares.ts';
 import { buildNetwork, planJourneys } from '../src/lib/planner.ts';
+import { registerOperators } from '../src/lib/operators.ts';
 import { Routeing, type PermittedRoutes, type RouteingData } from '../src/lib/routeing.ts';
 import { clock, type DataMeta, type DayFile, type Station } from '../src/lib/timetable.ts';
 
@@ -14,6 +15,7 @@ const [from, to, dateArg] = process.argv.slice(2);
 if (!from || !to) throw new Error('Usage: data:check -- FROM TO [date]');
 const date = dateArg || read<DataMeta>('meta.json').from;
 const meta = read<FaresMeta>('fares-meta.json');
+if (existsSync(`${DATA}/operators.json`)) registerOperators(read<Record<string, string>>('operators.json'));
 const sets = read<RestrictionSet[]>('restrictions.json');
 const stations = read<Station[]>('stations.json');
 const names = new Map(stations.map((s) => [s.crs, s.name]));

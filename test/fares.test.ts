@@ -12,6 +12,7 @@ import {
   type FaresMeta,
   type TicketType,
 } from '../src/lib/fares.ts';
+import { operatorName, registerOperators } from '../src/lib/operators.ts';
 import type { Journey, Leg } from '../src/lib/timetable.ts';
 
 /** Builds a fixed-width record from [position, value] pairs. */
@@ -157,9 +158,21 @@ describe('routes', () => {
     expect(routeOperators('GWR ONLY (00820)')).toEqual({ only: ['GW'] });
     expect(routeOperators('LNR/WMR &XC ONLY')).toEqual({ only: ['LM', 'LM', 'XC'] });
     expect(routeOperators('NOT HEATHROW EXP')).toEqual({ not: ['HX'] });
-    expect(routeOperators('NOT VIA LEEDS')).toEqual({ not: undefined });
-    expect(routeOperators('NOT VALID ON HS1')).toEqual({ not: undefined });
-    expect(routeOperators('SOMEWHERE ONLY')).toEqual({ only: undefined });
+    expect(routeOperators('NOT VIA LEEDS')).toEqual({ unread: true });
+    expect(routeOperators('NOT VALID ON HS1')).toEqual({ unread: true });
+    expect(routeOperators('SOMEWHERE ONLY')).toEqual({ unread: true });
+    // Wording seen in the fares feed.
+    expect(routeOperators('EMR-ONLY.')).toEqual({ only: ['EM'] });
+    expect(routeOperators('LNER TRAINS ONLY')).toEqual({ only: ['GR'] });
+    expect(routeOperators('S W RAILWAY ONLY')).toEqual({ only: ['SW'] });
+    expect(routeOperators('SW. RAILWAY ONLY')).toEqual({ only: ['SW'] });
+    expect(routeOperators('AVANTI WC ONLY..')).toEqual({ only: ['VT'] });
+    expect(routeOperators('TP HT GW ONLY')).toEqual({ only: ['TP', 'HT', 'GW'] });
+    expect(routeOperators('GW AW TP HT ONLY')).toEqual({ only: ['GW', 'AW', 'TP', 'HT'] });
+    expect(routeOperators('EMR & TLGN ONLY')).toEqual({ only: ['EM', 'TL', 'GN'] });
+    expect(routeOperators('TFWRS  ONLY')).toEqual({ only: ['AW'] });
+    expect(routeOperators('XC & NORTHN ONLY')).toEqual({ only: ['XC', 'NT'] });
+    expect(routeOperators('IPS-NRW ONLY')).toEqual({ unread: true });
   });
 
   it('marks trains of other operators not valid on an operator-only fare', () => {
@@ -170,6 +183,22 @@ describe('routes', () => {
       reason: 'Not valid: this ticket is LNER only',
     });
     expect(fareValidity(journey(600, undefined, 'GR'), fare, set, DATE, 'O', name).valid).toBe(true);
+  });
+
+  it("says to check when it can't read the operators a route names", () => {
+    const fare = { ...faresBetween(meta, files, 'LGE', 'SHF')[0], routeName: 'GBR EAST ONLY' };
+    const set = restrictionSetFor(sets, DATE);
+    expect(fareValidity(journey(600, undefined, 'GR'), fare, set, DATE, 'O', name)).toEqual({
+      valid: true,
+      reason: "The app can't check this ticket's route (GBR EAST ONLY); check before you travel",
+    });
+  });
+
+  it('reads operator names published with the data', () => {
+    registerOperators({ ZZ: 'Great British Railways East' });
+    expect(operatorName('ZZ')).toBe('Great British Railways East');
+    expect(operatorName('EM')).toBe('East Midlands Railway');
+    expect(routeOperators('GREAT BRITISH RAILWAYS EAST ONLY')).toEqual({ only: ['ZZ'] });
   });
 });
 
