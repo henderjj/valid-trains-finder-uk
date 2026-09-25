@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, ticketKind } from '../pipeline/fares.ts';
-import { checkValidity, faresBetween, restrictionSetFor, type FaresMeta } from '../src/lib/fares.ts';
+import { checkValidity, fareValidity, faresBetween, restrictionSetFor, routeOperators, type FaresMeta } from '../src/lib/fares.ts';
 import type { DirectJourney } from '../src/lib/timetable.ts';
 
 /** Builds a fixed-width record from [position, value] pairs. */
@@ -129,5 +129,25 @@ describe('restrictions', () => {
 
   it('treats tickets without a restriction as valid on any train', () => {
     expect(check(7 * 60, DATE, '').valid).toBe(true);
+  });
+});
+
+describe('routes', () => {
+  it('reads operator limits from route descriptions', () => {
+    expect(routeOperators('LNER ONLY')).toEqual({ only: ['GR'] });
+    expect(routeOperators('GC/HT ONLY')).toEqual({ only: ['GC', 'HT'] });
+    expect(routeOperators('NOT LUMO')).toEqual({ not: ['LD'] });
+    expect(routeOperators('VIA YORK')).toEqual({});
+    expect(routeOperators('SOMEWHERE ONLY')).toEqual({ only: undefined });
+  });
+
+  it('marks trains of other operators not valid on an operator-only fare', () => {
+    const fare = { ...faresBetween(meta, files, 'LGE', 'SHF')[0], routeName: 'LNER ONLY' };
+    const set = restrictionSetFor(sets, DATE);
+    expect(fareValidity({ ...journey(600), operator: 'LD' }, fare, set, DATE, 'O', name)).toEqual({
+      valid: false,
+      reason: 'Not valid: this ticket is LNER only',
+    });
+    expect(fareValidity({ ...journey(600), operator: 'GR' }, fare, set, DATE, 'O', name).valid).toBe(true);
   });
 });

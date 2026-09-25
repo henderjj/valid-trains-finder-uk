@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { RouteFares } from './App.tsx';
-import { checkValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
+import { fareValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
 import { operatorName } from './lib/operators.ts';
 import { clock, duration, type DirectJourney, type Station } from './lib/timetable.ts';
 
@@ -41,7 +41,7 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
     const map = new Map<DirectJourney, Validity>();
     if (!ticket || !fares) return map;
     const set = restrictionSetFor(fares.sets, date);
-    for (const j of journeys) map.set(j, checkValidity(j, ticket.restriction, set, date, leg, name));
+    for (const j of journeys) map.set(j, fareValidity(j, ticket, set, date, leg, name));
     return map;
   }, [ticket, fares, journeys, date, leg, names]);
 

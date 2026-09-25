@@ -1,5 +1,6 @@
 // Published fares formats, fare lookup and ticket validity checking. Shared by the data
 // pipeline (which writes the files) and the app (which reads them).
+import { operatorName, operatorsNamed } from './operators.ts';
 import type { DirectJourney } from './timetable.ts';
 
 export type TicketKind = 'anytime' | 'offpeak' | 'superoffpeak';
@@ -110,7 +111,7 @@ export function faresBetween(meta: FaresMeta, files: Map<string, FareFile>, from
     .map((b) => b.option)
     .sort(
       (a, b) =>
-        a.type.cls - b.type.cls ||
+        b.type.cls - a.type.cls ||
         Number(a.type.ret) - Number(b.type.ret) ||
         kindOrder.indexOf(a.type.kind) - kindOrder.indexOf(b.type.kind) ||
         a.pence - b.pence,
@@ -135,6 +136,32 @@ const inWindow = (t: number, w: TimeWindow) => {
   const m = ((t % 1440) + 1440) % 1440;
   return w.from <= w.to ? m >= w.from && m <= w.to : m >= w.from || m <= w.to;
 };
+
+/**
+ * Operator limits read from a route description: "LNER ONLY" allows only those operators,
+ * "NOT LNER" excludes them. Other routes (via a station, avoiding one) need routeing checks
+ * and are not interpreted here.
+ */
+export function routeOperators(desc: string): { only?: string[]; not?: string[] } {
+  const d = desc.trim().toUpperCase();
+  const only = /^(.+?)\s+ONLY$/.exec(d);
+  if (only) return { only: operatorsNamed(only[1]) ?? undefined };
+  const not = /^(?:NOT|EXCL?\.?|EXCLUDING)\s+(.+)$/.exec(d);
+  if (not) return { not: operatorsNamed(not[1]) ?? undefined };
+  return {};
+}
+
+/** Whether a fare's route lets it be used on this train's operator. */
+export function checkRoute(journey: DirectJourney, routeName: string): Validity {
+  const { only, not } = routeOperators(routeName);
+  if (only && !only.includes(journey.operator)) {
+    return { valid: false, reason: `Not valid: this ticket is ${only.map(operatorName).join(' or ')} only` };
+  }
+  if (not?.includes(journey.operator)) {
+    return { valid: false, reason: `Not valid: this ticket is not valid on ${operatorName(journey.operator)}` };
+  }
+  return { valid: true };
+}
 
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
@@ -192,4 +219,17 @@ export function checkValidity(
     }
   }
   return { valid: true };
+}
+
+/** Whether a fare can be used on a direct journey: its route first, then its restriction. */
+export function fareValidity(
+  journey: DirectJourney,
+  fare: FareOption,
+  set: RestrictionSet | undefined,
+  date: string,
+  dir: 'O' | 'R',
+  names: (crs: string) => string,
+): Validity {
+  const route = checkRoute(journey, fare.routeName);
+  return route.valid ? checkValidity(journey, fare.restriction, set, date, dir, names) : route;
 }

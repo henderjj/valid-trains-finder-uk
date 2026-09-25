@@ -2,7 +2,7 @@
 // from the built data in public/data/. A quick way to check results against known cases.
 // Usage: npm run data:check -- FROM TO [date YYYY-MM-DD, default the first built day]
 import { existsSync, readFileSync } from 'node:fs';
-import { checkValidity, faresBetween, restrictionSetFor, type FareFile, type FaresMeta, type RestrictionSet } from '../src/lib/fares.ts';
+import { fareValidity, faresBetween, restrictionSetFor, type FareFile, type FaresMeta, type RestrictionSet } from '../src/lib/fares.ts';
 import { clock, findDirect, type DataMeta, type DayFile, type Station } from '../src/lib/timetable.ts';
 
 const DATA = 'public/data';
@@ -27,7 +27,12 @@ for (const f of faresBetween(meta, files, from, to)) {
   const r = f.restriction ? set?.restrictions[f.restriction] : undefined;
   console.log(`\n${f.ticket} ${f.type.name} £${(f.pence / 100).toFixed(2)} route ${f.route} (${f.routeName}) restriction ${f.restriction || '-'} ${r ? `"${r.desc}" ${r.out}` : ''}`);
   for (const j of journeys) {
-    const v = checkValidity(j, f.restriction, set, date, 'O', name);
+    const v = fareValidity(j, f, set, date, 'O', name);
     console.log(`  ${clock(j.dep)} ${j.operator} ${v.valid ? 'valid' : 'NOT valid'}${v.reason ? `: ${v.reason}` : ''}`);
   }
+}
+
+if (process.env.LIST_ROUTES) {
+  console.log('\nOperator-limited routes:');
+  for (const [code, desc] of Object.entries(meta.routes)) if (/ONLY|NOT|EXCL/.test(desc)) console.log(`  ${code} ${desc}`);
 }

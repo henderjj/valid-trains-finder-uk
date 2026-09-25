@@ -26,4 +26,5 @@ jobs:
       - run: du -sh public/data/fares && ls public/data/fares | wc -l && ls -S -l public/data/fares | head -6 && ls -l public/data/*.json
       - run: npm run -s data:check -- LGE SHF
       - run: npm run -s data:check -- SHF LGE
-      - run: npm run -s data:check -- KGX EDB 2>&1 | head -60
+      - run: npm run -s data:check -- KGX EDB 2>&1 | grep -E "^[A-Z0-9]{3} |LD |Lumo" | head -60
+      - run: LIST_ROUTES=1 npm run -s data:check -- LGE SHF | sed -n '/Operator-limited/,$p' | head -150
