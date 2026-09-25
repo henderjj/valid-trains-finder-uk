@@ -1,0 +1,23 @@
+# Temporary spike: downloads the routeing guide feed and prints its structure.
+name: Routeing inspect
+
+on:
+  push:
+    branches: [routeing-guide]
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Download routeing guide feed
+        run: npm run data:download -- routeing
+        env:
+          NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
+          NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
+      - run: npx tsx pipeline/inspect-routeing.ts
