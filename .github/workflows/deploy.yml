@@ -1,10 +1,14 @@
-# Builds the timetable data and the app together and publishes them to GitHub Pages,
-# so the app and its data always match.
+# Builds the timetable and fares data and the app together and publishes them to GitHub
+# Pages, so the app and its data always match. The weekly run refreshes the data, which
+# covers the 28 days from the day it is built.
 name: Deploy
 
 on:
   push:
     branches: [main]
+  schedule:
+    # Mondays at 03:30 UTC.
+    - cron: '30 3 * * 1'
   workflow_dispatch:
     inputs:
       days:
