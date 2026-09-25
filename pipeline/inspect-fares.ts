@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 
 const ZIP = 'data/raw/fares.zip';
-const unzip = (...args: string[]) => execFileSync('unzip', args, { maxBuffer: 1 << 31, encoding: 'latin1' });
+const unzip = (...args: string[]) => execFileSync('unzip', args, { maxBuffer: 2 ** 30, encoding: 'latin1' });
 const members = unzip('-Z1', ZIP).split('\n').filter(Boolean);
 const file = (ext: string) => {
   const m = members.find((n) => n.endsWith(`.${ext}`));
