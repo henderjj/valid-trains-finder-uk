@@ -1,6 +1,7 @@
 // Published fares formats, fare lookup and ticket validity checking. Shared by the data
 // pipeline (which writes the files) and the app (which reads them).
 import { operatorName, operatorsNamed } from './operators.ts';
+import type { Routeing } from './routeing.ts';
 import type { Journey } from './timetable.ts';
 
 export type TicketKind = 'anytime' | 'offpeak' | 'superoffpeak';
@@ -241,7 +242,10 @@ export function checkValidity(
   return { valid: true };
 }
 
-/** Whether a fare can be used on a journey: its route first, then its restriction. */
+/**
+ * Whether a fare can be used on a journey: the operators its route allows, then the
+ * routeing guide's permitted routes (when loaded), then its time restriction.
+ */
 export function fareValidity(
   journey: Journey,
   fare: FareOption,
@@ -249,7 +253,13 @@ export function fareValidity(
   date: string,
   dir: 'O' | 'R',
   names: (crs: string) => string,
+  routeing?: Routeing,
 ): Validity {
   const route = checkRoute(journey, fare.routeName);
-  return route.valid ? checkValidity(journey, fare.restriction, set, date, dir, names) : route;
+  if (!route.valid) return route;
+  if (routeing && journey.legs.length > 1 && routeing.check(journey) === false) {
+    const via = journey.legs.slice(1).map((l) => names(l.calls[0].crs));
+    return { valid: false, reason: `Not valid: changing at ${via.join(' and ')} is not a permitted route` };
+  }
+  return checkValidity(journey, fare.restriction, set, date, dir, names);
 }

@@ -1,12 +1,12 @@
-# Temporary spike: downloads the routeing guide feed and prints its structure.
-name: Routeing inspect
+# Temporary check: builds routeing guide data and checks real journeys. Removed before merge.
+name: Routeing check
 
 on:
   push:
     branches: [routeing-guide]
 
 jobs:
-  inspect:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -15,9 +15,16 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Download routeing guide feed
-        run: npm run data:download -- routeing
+      - name: Download feeds
+        run: npm run data:download -- timetable fares routeing
         env:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
-      - run: npx tsx pipeline/inspect-routeing.ts
+      - run: npm run data:build -- 2026-09-28 1
+      - run: grep -o '"LGE":\[[^]]*\]\|"MAN":\[[^]]*\]\|"SHF":\[[^]]*\]\|"EDB":\[[^]]*\]' public/data/routeing.json
+      - run: npm run -s data:check -- LGE MAN | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- LGE SHF | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- LGE LDS | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- KGX EDB | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- NOT BHM | sed -n '1,/^$/p'
+      - run: npm run -s data:check -- DBY LIV | sed -n '1,/^$/p'
