@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Results } from './Results.tsx';
 import { StationInput } from './StationInput.tsx';
-import { loadFares, loadMeta, loadRestrictions, loadStations, ukToday } from './lib/data.ts';
+import { loadFares, loadMeta, loadRestrictions, loadRouteing, loadStations, ukToday } from './lib/data.ts';
 import type { FareOption, RestrictionSet } from './lib/fares.ts';
 import { planJourneysInBackground } from './lib/plan.ts';
+import type { Routeing } from './lib/routeing.ts';
 import type { DataMeta, Journey, Station } from './lib/timetable.ts';
 
 interface Route {
@@ -42,12 +43,19 @@ export interface RouteFares {
   /** Returns bought at the destination, whose return half comes back this way. */
   back: FareOption[];
   sets: RestrictionSet[];
+  /** The routeing guide's permitted routes, when published. */
+  routeing: Routeing | null;
 }
 
 /** Fares are optional: without them the app still lists trains. */
 const loadRouteFares = (route: Route): Promise<RouteFares | null> =>
-  Promise.all([loadFares(route.from.crs, route.to.crs), loadFares(route.to.crs, route.from.crs), loadRestrictions()])
-    .then(([out, back, sets]) => ({ out, back: back.filter((f) => f.type.ret), sets }))
+  Promise.all([
+    loadFares(route.from.crs, route.to.crs),
+    loadFares(route.to.crs, route.from.crs),
+    loadRestrictions(),
+    loadRouteing(route.from.crs, route.to.crs).catch(() => null),
+  ])
+    .then(([out, back, sets, routeing]) => ({ out, back: back.filter((f) => f.type.ret), sets, routeing }))
     .catch(() => null);
 
 type Status =

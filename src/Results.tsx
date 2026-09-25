@@ -41,7 +41,7 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
     const map = new Map<Journey, Validity>();
     if (!ticket || !fares) return map;
     const set = restrictionSetFor(fares.sets, date);
-    for (const j of journeys) map.set(j, fareValidity(j, ticket, set, date, leg, name));
+    for (const j of journeys) map.set(j, fareValidity(j, ticket, set, date, leg, name, fares.routeing ?? undefined));
     return map;
   }, [ticket, fares, journeys, date, leg, names]);
 
