@@ -138,6 +138,12 @@ describe('routes', () => {
     expect(routeOperators('GC/HT ONLY')).toEqual({ only: ['GC', 'HT'] });
     expect(routeOperators('NOT LUMO')).toEqual({ not: ['LD'] });
     expect(routeOperators('VIA YORK')).toEqual({});
+    expect(routeOperators('EMR ONLY.')).toEqual({ only: ['EM'] });
+    expect(routeOperators('GWR ONLY (00820)')).toEqual({ only: ['GW'] });
+    expect(routeOperators('LNR/WMR &XC ONLY')).toEqual({ only: ['LM', 'LM', 'XC'] });
+    expect(routeOperators('NOT HEATHROW EXP')).toEqual({ not: ['HX'] });
+    expect(routeOperators('NOT VIA LEEDS')).toEqual({ not: undefined });
+    expect(routeOperators('NOT VALID ON HS1')).toEqual({ not: undefined });
     expect(routeOperators('SOMEWHERE ONLY')).toEqual({ only: undefined });
   });
 

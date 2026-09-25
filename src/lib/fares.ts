@@ -143,7 +143,11 @@ const inWindow = (t: number, w: TimeWindow) => {
  * and are not interpreted here.
  */
 export function routeOperators(desc: string): { only?: string[]; not?: string[] } {
-  const d = desc.trim().toUpperCase();
+  // Descriptions are 16 characters and sometimes end in a full stop or a bracketed code.
+  const d = desc
+    .toUpperCase()
+    .replace(/\(.*?\)|\.+\s*$/g, '')
+    .trim();
   const only = /^(.+?)\s+ONLY$/.exec(d);
   if (only) return { only: operatorsNamed(only[1]) ?? undefined };
   const not = /^(?:NOT|EXCL?\.?|EXCLUDING)\s+(.+)$/.exec(d);
