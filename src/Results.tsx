@@ -2,13 +2,13 @@ import { useMemo, useState } from 'preact/hooks';
 import type { RouteFares } from './App.tsx';
 import { fareValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
 import { operatorName } from './lib/operators.ts';
-import { clock, duration, type DirectJourney, type Station } from './lib/timetable.ts';
+import { clock, duration, type Journey, type Station } from './lib/timetable.ts';
 
 interface Props {
   from: Station;
   to: Station;
   date: string;
-  journeys: DirectJourney[];
+  journeys: Journey[];
   fares: RouteFares | null;
   stations: Station[];
 }
@@ -38,7 +38,7 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
   const ticket = options.find((f) => optionKey(f) === picked) ?? options.find((f) => f.ticket === picked.split('/')[0]);
 
   const validity = useMemo(() => {
-    const map = new Map<DirectJourney, Validity>();
+    const map = new Map<Journey, Validity>();
     if (!ticket || !fares) return map;
     const set = restrictionSetFor(fares.sets, date);
     for (const j of journeys) map.set(j, fareValidity(j, ticket, set, date, leg, name));
@@ -50,11 +50,8 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
   const restriction = ticket?.restriction ? restrictionSetFor(fares?.sets ?? [], date)?.restrictions[ticket.restriction] : undefined;
   const restrictionText = restriction && (leg === 'O' ? restriction.out : restriction.rtn || restriction.out);
 
-  const summary = !journeys.length
-    ? 'No direct trains'
-    : ticket
-      ? `${validCount} of ${journeys.length} direct ${journeys.length === 1 ? 'train' : 'trains'} valid`
-      : `${journeys.length} direct ${journeys.length === 1 ? 'train' : 'trains'}`;
+  const count = `${journeys.length} ${journeys.length === 1 ? 'journey' : 'journeys'}`;
+  const summary = !journeys.length ? 'No journeys found' : ticket ? `${validCount} of ${count} valid` : count;
 
   return (
     <section class="results" aria-live="polite">
@@ -107,15 +104,18 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
         </div>
       )}
 
-      {journeys.length === 0 && <p>Journeys with changes are coming in a later version.</p>}
+      {journeys.length === 0 && <p>No journeys with up to two changes were found on this day.</p>}
       {journeys.length > 0 && shown.length === 0 && (
-        <p>None of the direct trains are valid with this ticket. Untick "Show valid trains only" to see them all.</p>
+        <p>None of these journeys are valid with this ticket. Untick "Show valid trains only" to see them all.</p>
       )}
       <ol class="journeys">
         {shown.map((j) => {
-          const key = `${j.uid}-${j.dep}`;
+          const key = j.legs.map((l) => `${l.uid}-${l.dep}`).join('+');
           const expanded = open === key;
           const v = validity.get(j);
+          const changes = j.legs.length - 1;
+          const changeAt = j.legs.slice(1).map((l) => name(l.calls[0].crs));
+          const operators = [...new Set(j.legs.map((l) => operatorName(l.operator)))].join(', ');
           return (
             <li key={key} class={`journey${v && !v.valid ? ' invalid' : ''}`}>
               <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : key)}>
@@ -124,8 +124,13 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
                 </span>
                 <span class="duration">{duration(j.arr - j.dep)}</span>
                 <span class="meta">
-                  {j.stops === 0 ? 'Non-stop' : `${j.stops} ${j.stops === 1 ? 'stop' : 'stops'}`} · {operatorName(j.operator)}
-                  {j.bus && ' · Bus'}
+                  {changes === 0
+                    ? j.legs[0].stops === 0
+                      ? 'Direct, non-stop'
+                      : `Direct, ${j.legs[0].stops} ${j.legs[0].stops === 1 ? 'stop' : 'stops'}`
+                    : `${changes} ${changes === 1 ? 'change' : 'changes'} at ${changeAt.join(' and ')}`}{' '}
+                  · {operators}
+                  {j.legs.some((l) => l.bus) && ' · Bus'}
                 </span>
                 {v && (
                   <span class={`validity ${v.valid ? 'ok' : 'no'}`}>
@@ -134,16 +139,28 @@ export function Results({ from, to, date, journeys, fares, stations }: Props) {
                   </span>
                 )}
               </button>
-              {expanded && (
-                <ol class="calls">
-                  {j.calls.map((c, i) => (
-                    <li key={`${c.crs}-${i}`}>
-                      <span class="call-time">{clock((i === 0 ? c.dep : c.arr) ?? c.dep ?? 0)}</span>
-                      <span>{name(c.crs)}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
+              {expanded &&
+                j.legs.map((leg, n) => (
+                  <div key={`${leg.uid}-${leg.dep}`}>
+                    {n > 0 && (
+                      <p class="change">
+                        Change at {name(leg.calls[0].crs)}, {duration(leg.dep - j.legs[n - 1].arr)} to change
+                      </p>
+                    )}
+                    <p class="leg-title">
+                      {operatorName(leg.operator)}
+                      {leg.bus ? ' bus' : ''}
+                    </p>
+                    <ol class="calls">
+                      {leg.calls.map((c, i) => (
+                        <li key={`${c.crs}-${i}`}>
+                          <span class="call-time">{clock((i === 0 ? c.dep : c.arr) ?? c.dep ?? 0)}</span>
+                          <span>{name(c.crs)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
             </li>
           );
         })}

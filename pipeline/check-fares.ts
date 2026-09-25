@@ -1,9 +1,10 @@
-// Prints the walk-up fares between two stations and which direct trains each is valid on,
+// Prints the walk-up fares between two stations and which journeys each is valid on,
 // from the built data in public/data/. A quick way to check results against known cases.
 // Usage: npm run data:check -- FROM TO [date YYYY-MM-DD, default the first built day]
 import { existsSync, readFileSync } from 'node:fs';
 import { fareValidity, faresBetween, restrictionSetFor, type FareFile, type FaresMeta, type RestrictionSet } from '../src/lib/fares.ts';
-import { clock, findDirect, type DataMeta, type DayFile, type Station } from '../src/lib/timetable.ts';
+import { buildNetwork, planJourneys } from '../src/lib/planner.ts';
+import { clock, type DataMeta, type DayFile, type Station } from '../src/lib/timetable.ts';
 
 const DATA = 'public/data';
 const read = <T>(path: string): T => JSON.parse(readFileSync(`${DATA}/${path}`, 'utf8')) as T;
@@ -20,15 +21,20 @@ for (const code of meta.locations[from] ?? []) {
   if (existsSync(`${DATA}/fares/${code}.json`)) files.set(code, read<FareFile>(`fares/${code}.json`));
 }
 
-const journeys = findDirect(read<DayFile>(`days/${date}.json`), from, to);
+const day = read<DayFile>(`days/${date}.json`);
+const started = performance.now();
+const net = buildNetwork(day);
+const built = performance.now();
+const journeys = planJourneys(net, day, from, to);
+console.log(`Network ${(built - started).toFixed(0)} ms, search ${(performance.now() - built).toFixed(0)} ms`);
 const set = restrictionSetFor(sets, date);
-console.log(`${name(from)} → ${name(to)} on ${date}: ${journeys.length} direct trains; fare codes ${meta.locations[from]} → ${meta.locations[to]}`);
+console.log(`${name(from)} → ${name(to)} on ${date}: ${journeys.length} journeys; fare codes ${meta.locations[from]} → ${meta.locations[to]}`);
 for (const f of faresBetween(meta, files, from, to)) {
   const r = f.restriction ? set?.restrictions[f.restriction] : undefined;
   console.log(`\n${f.ticket} ${f.type.name} £${(f.pence / 100).toFixed(2)} route ${f.route} (${f.routeName}) restriction ${f.restriction || '-'} ${r ? `"${r.desc}" ${r.out}` : ''}`);
   for (const j of journeys) {
     const v = fareValidity(j, f, set, date, 'O', name);
-    console.log(`  ${clock(j.dep)} ${j.operator} ${v.valid ? 'valid' : 'NOT valid'}${v.reason ? `: ${v.reason}` : ''}`);
+    console.log(`  ${clock(j.dep)}-${clock(j.arr)} ${j.legs.map((l) => `${l.operator} ${l.calls[0].crs}`).join(' > ')} ${v.valid ? 'valid' : 'NOT valid'}${v.reason ? `: ${v.reason}` : ''}`);
   }
 }
 

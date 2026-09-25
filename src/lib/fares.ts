@@ -1,7 +1,7 @@
 // Published fares formats, fare lookup and ticket validity checking. Shared by the data
 // pipeline (which writes the files) and the app (which reads them).
 import { operatorName, operatorsNamed } from './operators.ts';
-import type { DirectJourney } from './timetable.ts';
+import type { Journey } from './timetable.ts';
 
 export type TicketKind = 'anytime' | 'offpeak' | 'superoffpeak';
 
@@ -132,6 +132,12 @@ function inBands(bands: DateBand[], date: string): boolean {
   });
 }
 
+/** "09:05" style clock time; wraps past midnight. */
+const hhmm = (t: number) => {
+  const m = ((t % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
+
 const inWindow = (t: number, w: TimeWindow) => {
   const m = ((t % 1440) + 1440) % 1440;
   return w.from <= w.to ? m >= w.from && m <= w.to : m >= w.from || m <= w.to;
@@ -155,19 +161,20 @@ export function routeOperators(desc: string): { only?: string[]; not?: string[] 
   return {};
 }
 
-/** Whether a fare's route lets it be used on this train's operator. */
-export function checkRoute(journey: DirectJourney, routeName: string): Validity {
+/** Whether a fare's route lets it be used on the operators of every train in the journey. */
+export function checkRoute(journey: Journey, routeName: string): Validity {
   const { only, not } = routeOperators(routeName);
-  if (only && !only.includes(journey.operator)) {
-    return { valid: false, reason: `Not valid: this ticket is ${only.map(operatorName).join(' or ')} only` };
-  }
-  if (not?.includes(journey.operator)) {
-    return { valid: false, reason: `Not valid: this ticket is not valid on ${operatorName(journey.operator)}` };
+  for (const leg of journey.legs) {
+    if (only && !only.includes(leg.operator)) {
+      const which = journey.legs.length > 1 ? ` (the ${hhmm(leg.dep)} is ${operatorName(leg.operator)})` : '';
+      return { valid: false, reason: `Not valid: this ticket is ${only.map(operatorName).join(' or ')} only${which}` };
+    }
+    if (not?.includes(leg.operator)) {
+      return { valid: false, reason: `Not valid: this ticket is not valid on ${operatorName(leg.operator)}` };
+    }
   }
   return { valid: true };
 }
-
-const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 export interface Validity {
   valid: boolean;
@@ -176,11 +183,11 @@ export interface Validity {
 }
 
 /**
- * Whether a ticket with this restriction code can be used on a direct journey. `names`
- * turns CRS codes into station names for the explanation.
+ * Whether a ticket with this restriction code can be used on a journey. `names` turns CRS
+ * codes into station names for the explanation.
  */
 export function checkValidity(
-  journey: DirectJourney,
+  journey: Journey,
   restrictionCode: string,
   set: RestrictionSet | undefined,
   date: string,
@@ -192,42 +199,51 @@ export function checkValidity(
   if (!r) return { valid: true, reason: `Restriction ${restrictionCode} not found; check before you travel` };
   if (!inBands(r.dates, date)) return { valid: true };
 
-  const board = journey.calls[0].crs;
-  const alight = journey.calls[journey.calls.length - 1].crs;
+  const { legs } = journey;
+  const origin = legs[0].calls[0].crs;
+  const lastLeg = legs[legs.length - 1];
+  const destination = lastLeg.calls[lastLeg.calls.length - 1].crs;
   const trainsMode = dir === 'O' ? r.trainsOut : r.trainsRtn;
-  const listed = r.trains.some(
-    (t) =>
-      t.dir === dir &&
-      t.uid === journey.uid &&
-      inBands(t.dates, date) &&
-      (!t.at.length || t.at.some(([crs, how]) => (crs === board && how !== 'A') || (crs === alight && how !== 'D'))),
-  );
-  if (listed && trainsMode === 'N') return { valid: false, reason: 'This train is excluded for this ticket' };
-  if (listed && trainsMode === 'P') return { valid: true };
+  const listed = legs.filter((leg) => {
+    const board = leg.calls[0].crs;
+    const alight = leg.calls[leg.calls.length - 1].crs;
+    return r.trains.some(
+      (t) =>
+        t.dir === dir &&
+        t.uid === leg.uid &&
+        inBands(t.dates, date) &&
+        (!t.at.length || t.at.some(([crs, how]) => (crs === board && how !== 'A') || (crs === alight && how !== 'D'))),
+    );
+  });
+  if (listed.length && trainsMode === 'N') {
+    return { valid: false, reason: `Not valid: the ${hhmm(listed[0].dep)} from ${names(listed[0].calls[0].crs)} is excluded for this ticket` };
+  }
+  // Trains the restriction lists as permitted can be used whatever the time.
+  const checked = trainsMode === 'P' ? legs.filter((leg) => !listed.includes(leg)) : legs;
 
   for (const w of r.windows) {
     if (w.dir !== dir || !inBands(w.dates, date)) continue;
-    if (w.tocs.length && !w.tocs.includes(journey.operator)) continue;
-    const crs = w.crs || (w.at === 'A' ? alight : board);
-    const call = journey.calls.find((c) => c.crs === crs);
-    if (!call) continue;
-    const time = w.at === 'A' ? call.arr : w.at === 'D' ? call.dep : (call.dep ?? call.arr);
-    // A departure window only counts where the passenger is on the train leaving that station.
-    if (time === null || (w.at === 'D' && crs === alight) || (w.at === 'A' && crs === board)) continue;
-    if (inWindow(time, w)) {
+    const crs = w.crs || (w.at === 'A' ? destination : origin);
+    for (const leg of checked) {
+      if (w.tocs.length && !w.tocs.includes(leg.operator)) continue;
+      const i = leg.calls.findIndex((c) => c.crs === crs);
+      if (i === -1) continue;
+      // A departure only counts where the passenger boards or stays on, an arrival where
+      // they alight or were already on board.
+      if ((w.at === 'D' && i === leg.calls.length - 1) || (w.at === 'A' && i === 0)) continue;
+      const call = leg.calls[i];
+      const time = w.at === 'A' ? call.arr : w.at === 'D' ? call.dep : (call.dep ?? call.arr);
+      if (time === null || !inWindow(time, w)) continue;
       const verb = w.at === 'A' ? 'arrives at' : w.at === 'D' ? 'departs' : 'passes through';
-      return {
-        valid: false,
-        reason: `Not valid: ${verb} ${names(crs)} at ${hhmm(((time % 1440) + 1440) % 1440)} (restricted ${hhmm(w.from)}–${hhmm(w.to)})`,
-      };
+      return { valid: false, reason: `Not valid: ${verb} ${names(crs)} at ${hhmm(time)} (restricted ${hhmm(w.from)}–${hhmm(w.to)})` };
     }
   }
   return { valid: true };
 }
 
-/** Whether a fare can be used on a direct journey: its route first, then its restriction. */
+/** Whether a fare can be used on a journey: its route first, then its restriction. */
 export function fareValidity(
-  journey: DirectJourney,
+  journey: Journey,
   fare: FareOption,
   set: RestrictionSet | undefined,
   date: string,

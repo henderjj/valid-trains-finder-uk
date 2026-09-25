@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, ticketKind } from '../pipeline/fares.ts';
 import { checkValidity, fareValidity, faresBetween, restrictionSetFor, routeOperators, type FaresMeta } from '../src/lib/fares.ts';
-import type { DirectJourney } from '../src/lib/timetable.ts';
+import type { Journey, Leg } from '../src/lib/timetable.ts';
 
 /** Builds a fixed-width record from [position, value] pairs. */
 const rec = (...parts: [number, string][]) => {
@@ -51,7 +51,7 @@ const { files, routes, restrictions } = parseFares(ffl, tickets, DATE);
 const meta: FaresMeta = { locations: parseLocations(loc, fsc, DATE), tickets, routes: parseRoutes([], routes, DATE) };
 const sets = parseRestrictions(rst, restrictions);
 
-const journey = (dep: number, uid = 'C99999', operator = 'EM'): DirectJourney => ({
+const leg = (dep: number, uid = 'C99999', operator = 'EM'): Leg => ({
   uid,
   operator,
   headcode: '1F00',
@@ -65,6 +65,10 @@ const journey = (dep: number, uid = 'C99999', operator = 'EM'): DirectJourney =>
     { crs: 'SHF', arr: dep + 50, dep: null },
   ],
 });
+const journey = (dep: number, uid?: string, operator?: string): Journey => {
+  const l = leg(dep, uid, operator);
+  return { legs: [l], dep: l.dep, arr: l.arr };
+};
 const name = (crs: string) => ({ LGE: 'Long Eaton', SHF: 'Sheffield' })[crs] ?? crs;
 
 describe('ticket types', () => {
@@ -150,10 +154,36 @@ describe('routes', () => {
   it('marks trains of other operators not valid on an operator-only fare', () => {
     const fare = { ...faresBetween(meta, files, 'LGE', 'SHF')[0], routeName: 'LNER ONLY' };
     const set = restrictionSetFor(sets, DATE);
-    expect(fareValidity({ ...journey(600), operator: 'LD' }, fare, set, DATE, 'O', name)).toEqual({
+    expect(fareValidity(journey(600, undefined, 'LD'), fare, set, DATE, 'O', name)).toEqual({
       valid: false,
       reason: 'Not valid: this ticket is LNER only',
     });
-    expect(fareValidity({ ...journey(600), operator: 'GR' }, fare, set, DATE, 'O', name).valid).toBe(true);
+    expect(fareValidity(journey(600, undefined, 'GR'), fare, set, DATE, 'O', name).valid).toBe(true);
+  });
+});
+
+describe('journeys with changes', () => {
+  // Long Eaton 08:40 to Nottingham, then Nottingham 09:10 to Sheffield.
+  const first: Leg = { ...leg(0), dep: 520, arr: 530, stops: 0, calls: [{ crs: 'LGE', arr: null, dep: 520 }, { crs: 'NOT', arr: 530, dep: null }] };
+  const second: Leg = { ...leg(0, 'C77777', 'NT'), dep: 550, arr: 640, stops: 0, calls: [{ crs: 'NOT', arr: null, dep: 550 }, { crs: 'SHF', arr: 640, dep: null }] };
+  const trip: Journey = { legs: [first, second], dep: 520, arr: 640 };
+  const set = restrictionSetFor(sets, DATE);
+
+  it('applies an origin departure window to the first train only', () => {
+    expect(checkValidity(trip, '2O', set, DATE, 'O', name)).toEqual({
+      valid: false,
+      reason: 'Not valid: departs Long Eaton at 08:40 (restricted 04:30–09:00)',
+    });
+    // Leaving Long Eaton at 09:05 instead is fine; the change at Nottingham is not checked.
+    const later: Journey = { ...trip, dep: 545, legs: [{ ...first, dep: 545, calls: [{ ...first.calls[0], dep: 545 }, first.calls[1]] }, second] };
+    expect(checkValidity(later, '2O', set, DATE, 'O', name).valid).toBe(true);
+  });
+
+  it('checks the operator of every train', () => {
+    const fare = { ...faresBetween(meta, files, 'LGE', 'SHF')[0], routeName: 'EMR ONLY' };
+    expect(fareValidity(trip, fare, set, DATE, 'O', name)).toEqual({
+      valid: false,
+      reason: 'Not valid: this ticket is East Midlands Railway only (the 09:10 is Northern)',
+    });
   });
 });

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Results } from './Results.tsx';
 import { StationInput } from './StationInput.tsx';
-import { loadDay, loadFares, loadMeta, loadRestrictions, loadStations, ukToday } from './lib/data.ts';
+import { loadFares, loadMeta, loadRestrictions, loadStations, ukToday } from './lib/data.ts';
 import type { FareOption, RestrictionSet } from './lib/fares.ts';
-import { findDirect, type DataMeta, type DirectJourney, type Station } from './lib/timetable.ts';
+import { planJourneysInBackground } from './lib/plan.ts';
+import type { DataMeta, Journey, Station } from './lib/timetable.ts';
 
 interface Route {
   from: Station;
@@ -53,7 +54,7 @@ type Status =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'done'; route: Route; date: string; journeys: DirectJourney[]; fares: RouteFares | null };
+  | { kind: 'done'; route: Route; date: string; journeys: Journey[]; fares: RouteFares | null };
 
 export function App() {
   const [stations, setStations] = useState<Station[]>([]);
@@ -77,8 +78,7 @@ export function App() {
   const search = async (route: Route, day: string) => {
     setStatus({ kind: 'loading' });
     try {
-      const [timetable, fares] = await Promise.all([loadDay(day), loadRouteFares(route)]);
-      const journeys = findDirect(timetable, route.from.crs, route.to.crs);
+      const [journeys, fares] = await Promise.all([planJourneysInBackground(day, route.from.crs, route.to.crs), loadRouteFares(route)]);
       setStatus({ kind: 'done', route, date: day, journeys, fares });
       setRecent(saveRecent(route));
     } catch (err) {

@@ -311,3 +311,19 @@ select {
 .journey.invalid .times {
   color: var(--muted);
 }
+
+.leg-title,
+.change {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.leg-title {
+  font-weight: 600;
+}
+
+.change {
+  color: var(--muted);
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 3px dotted var(--border);
+}
