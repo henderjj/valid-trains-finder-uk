@@ -22,6 +22,7 @@ jobs:
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
       - run: npm run data:build -- 2026-09-28 1
       - run: node -e "const d=require('./public/data/routeing.json'); console.log(d.london, d.nodes.length, Object.keys(d.fareRoutes).length, JSON.stringify(Object.entries(d.fareRoutes).slice(0,8)))"
+      - run: node -e "const d=require('./public/data/routeing.json'); const r=require('./public/data/routeing/CHD.json'); const g=require('./public/data/routeing/G09.json'); console.log(d.stations.LGE, d.groups.LGE, d.stations.CHD, d.groups.NOT, d.groups.EMD, d.stations.EMD, JSON.stringify(r.G09), JSON.stringify(g.CHD), d.links['CHD-G43'], d.links['G09-G43'], d.links['CHD-G09'], d.distances.filter(x=>x.includes('LIV')||x.includes('TAM')||x.includes('BUT')).length)"
       - run: npm run -s data:check -- LGE MAN | sed -n '1,/^$/p'
       - run: npm run -s data:check -- DBY LIV | sed -n '1,/^$/p'
       - run: npm run -s data:check -- NOT BHM | sed -n '1,/^$/p'
@@ -30,4 +31,4 @@ jobs:
       - run: npm run -s data:check -- NRW BHM | sed -n '1,/^$/p'
       - run: npm run -s data:check -- PBO BRI | sed -n '1,/^$/p'
       - run: npm run -s data:check -- CHD LGE | sed -n '1,/^$/p'
-      - run: npm run -s data:check -- LGE MAN | grep -B1 -A3 -i 'via\\|not ' | head -80
+      - run: npm run -s data:check -- LGE MAN | grep -i -A40 'via' | head -60

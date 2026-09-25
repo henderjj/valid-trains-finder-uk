@@ -1,6 +1,7 @@
 // Loads the published data files. The service worker caches them, so a day that has been
 // searched once also works offline.
 import { faresBetween, type FareFile, type FareOption, type FaresMeta, type RestrictionSet } from './fares.ts';
+import { Routeing, type PermittedRoutes, type RouteingData } from './routeing.ts';
 import type { DataMeta, DayFile, Station } from './timetable.ts';
 
 const base = `${import.meta.env.BASE_URL}data/`;
@@ -47,6 +48,31 @@ function loadFareFile(code: string): Promise<FareFile> {
     fareFiles.set(code, file);
   }
   return file;
+}
+
+const loadRouteingData = once(() => getJson<RouteingData>('routeing.json'));
+const routeFiles = new Map<string, Promise<PermittedRoutes>>();
+
+/**
+ * The routeing guide, with the permitted routes a journey between two stations needs, or
+ * null when the data isn't published.
+ */
+export async function loadRouteing(from: string, to: string): Promise<Routeing | null> {
+  const data = await loadRouteingData().catch(() => null);
+  if (!data) return null;
+  const codes = new Routeing(data, new Map()).routeFiles(from, to);
+  const routes = await Promise.all(
+    codes.map(async (code) => {
+      let file = routeFiles.get(code);
+      if (!file) {
+        file = fetch(`${base}routeing/${code}.json`).then((res) => (res.ok ? (res.json() as Promise<PermittedRoutes>) : {}));
+        file.catch(() => routeFiles.delete(code));
+        routeFiles.set(code, file);
+      }
+      return [code, await file] as const;
+    }),
+  );
+  return new Routeing(data, new Map(routes));
 }
 
 /** Walk-up fares from one station to another. */

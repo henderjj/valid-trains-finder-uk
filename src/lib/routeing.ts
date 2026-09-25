@@ -185,23 +185,33 @@ export class Routeing {
    * Every station a journey passes, following the shortest track between its calls (the
    * timetable lists only stops). Bus legs count as no distance, as the spec allows.
    */
-  private trace(journey: Journey): Path | null {
+  private trace(journey: Journey): Path | { missing: [string, string] } {
     const path: Path = { stations: [], miles: [], changes: [], operators: journey.legs.map((l) => l.operator) };
     let miles = 0;
     const add = (crs: string) => {
-      path.stations.push(this.station(crs));
+      const n = path.stations.length;
+      // The map draws some stations on short spurs off the line (Coleshill Parkway off Water
+      // Orton, say), so the shortest track to one and on again runs X, Y, X. Trains don't
+      // double back there, so drop the spur unless the journey changes train at it.
+      if (n >= 2 && path.stations[n - 2] === crs && !path.changes.includes(n - 1)) {
+        path.stations.pop();
+        path.miles.pop();
+        miles = path.miles[n - 2];
+        return;
+      }
+      path.stations.push(crs);
       path.miles.push(miles);
     };
     for (const [k, leg] of journey.legs.entries()) {
       if (k > 0) path.changes.push(path.stations.length - 1);
-      if (!path.stations.length) add(leg.calls[0].crs);
+      if (!path.stations.length) add(this.station(leg.calls[0].crs));
       for (let i = 0; i + 1 < leg.calls.length; i++) {
         if (leg.bus) {
-          add(leg.calls[i + 1].crs);
+          add(this.station(leg.calls[i + 1].crs));
           continue;
         }
         const p = this.shortest(leg.calls[i].crs, leg.calls[i + 1].crs);
-        if (!p) return null;
+        if (!p) return { missing: [leg.calls[i].crs, leg.calls[i + 1].crs] };
         for (let s = 1; s < p.via.length; s++) {
           miles += this.shortest(p.via[s - 1], p.via[s])!.miles;
           add(p.via[s]);
@@ -215,7 +225,7 @@ export class Routeing {
   check(journey: Journey): RouteCheck {
     if (journey.legs.length === 1) return { permitted: true, why: 'one train' };
     const path = this.trace(journey);
-    if (!path) return { permitted: undefined, why: 'no track data for part of the journey' };
+    if ('missing' in path) return { permitted: undefined, why: `no track data from ${path.missing.join(' to ')}` };
     return this.checkPath(path, 0, path.stations.length - 1);
   }
 
@@ -227,7 +237,7 @@ export class Routeing {
   checkFare(journey: Journey, route: string): RouteCheck {
     const r = this.data.fareRoutes[route];
     const path = r ? this.trace(journey) : null;
-    if (!r || !path) return this.check(journey);
+    if (!r || !path || 'missing' in path) return this.check(journey);
     const passes = (alternatives: string[]) => path.stations.some((s) => alternatives.includes(s));
     const missing = r.all?.find((a) => !passes(a)) ?? (r.any && !r.any.some(passes) ? r.any.flat() : undefined);
     if (missing) return { permitted: false, why: `does not go via ${missing[0]}` };

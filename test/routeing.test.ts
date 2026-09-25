@@ -117,3 +117,29 @@ describe('fare routes', () => {
     expect(routeing.checkFare(viaStoke, 'none').permitted).toBe(true);
   });
 });
+
+describe('tracing', () => {
+  // Coleshill Parkway (CEH) is drawn on a spur off Water Orton (WTO).
+  const spur = new Routeing(
+    parseRouteing({
+      stations: ['NUN,,,,,', 'CEH,NUN,,,,', 'WTO,NUN,,,,', 'BHM,,,,,'],
+      groups: [],
+      points: ['NUN', 'BHM'],
+      nodes: ['NUN', 'BHM'],
+      links: ['NUN,BHM,CS'],
+      distances: ['NUN,WTO,10', 'WTO,CEH,2', 'WTO,BHM,8', 'NUN,LEI,20'],
+      london: [],
+      newStations: [],
+      fareRoutes: [],
+    }),
+    parsePermittedRoutes([]),
+  );
+
+  it('ignores a spur the map draws off the line', () => {
+    expect(spur.check(journey(leg('XC', 'LEI', 'NUN'), leg('XC', 'NUN', 'CEH', 'BHM')))).toMatchObject({ permitted: true });
+  });
+
+  it('says which stations have no track between them', () => {
+    expect(spur.check(journey(leg('XC', 'NUN', 'BHM'), leg('XC', 'BHM', 'XXX'))).why).toBe('no track data from BHM to XXX');
+  });
+});
