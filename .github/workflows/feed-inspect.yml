@@ -1,0 +1,23 @@
+# Temporary check: prints the fares feed's operator file and unreadable route descriptions.
+name: Feed inspect
+
+on:
+  push:
+    branches: [data-checks]
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Download feeds
+        run: npm run data:download -- timetable fares
+        env:
+          NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
+          NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
+      - run: bash pipeline/inspect-feeds.sh
