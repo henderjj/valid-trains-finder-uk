@@ -49,6 +49,7 @@ describe('stations', () => {
       { crs: 'LGE', name: 'Long Eaton' },
       { crs: 'SHF', name: 'Sheffield' },
     ]);
+    expect(buildStations(cif, new Set(['LGE']), new Map([['LGE', 5]]))).toEqual([{ crs: 'LGE', name: 'Long Eaton', change: 5 }]);
   });
 
   it('title-cases names', () => {

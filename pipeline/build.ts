@@ -10,7 +10,7 @@ import { createInterface } from 'node:readline';
 import { gzipSync } from 'node:zlib';
 import type { FaresMeta } from '../src/lib/fares.ts';
 import type { DataMeta } from '../src/lib/timetable.ts';
-import { CifParser, type CifFile } from './cif.ts';
+import { CifParser, parseChangeTimes, type CifFile } from './cif.ts';
 import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes } from './fares.ts';
 import { parsePermittedRoutes, parseRouteing } from './routeing.ts';
 import { addDays, buildDay, buildStations, crsByTiploc } from './publish.ts';
@@ -118,8 +118,17 @@ async function main() {
     console.log(`${date}  ${String(day.trains.length).padStart(6)}  ${kb(json.length).padStart(7)}  ${kb(gzipSync(json).length).padStart(7)}`);
   }
 
-  const stations = buildStations(cif, served);
+  // Stations without a minimum connection time use the planner's default.
+  let changeTimes = new Map<string, number>();
+  try {
+    changeTimes = parseChangeTimes(member('data/raw/timetable.zip', 'MSN'));
+  } catch (err) {
+    console.log(`No station change times: ${(err as Error).message}`);
+  }
+  const stations = buildStations(cif, served, changeTimes);
   await writeFile(`${OUT}/stations.json`, JSON.stringify(stations));
+  const unusual = stations.filter((s) => s.change !== undefined && (s.change < 2 || s.change > 15));
+  console.log(`Change times: ${stations.filter((s) => s.change !== undefined).length} stations; unusual: ${unusual.map((s) => `${s.crs} ${s.change}`).join(', ')}`);
   const meta: DataMeta = { built: new Date().toISOString(), from: start, to: addDays(start, days - 1) };
   await writeFile(`${OUT}/meta.json`, JSON.stringify(meta));
   console.log(`${stations.length} stations`);

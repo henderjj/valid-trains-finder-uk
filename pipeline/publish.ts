@@ -79,12 +79,18 @@ export function titleCase(name: string): string {
     .replace(/[a-z][a-z']*/g, (w) => (KEEP_UPPER.has(w.toUpperCase()) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)));
 }
 
-/** One entry per CRS code that trains actually call at, sorted by name. */
-export function buildStations(cif: CifFile, served: Set<string>): Station[] {
+/**
+ * One entry per CRS code that trains actually call at, sorted by name, with the station's
+ * minimum connection time where the timetable gives one.
+ */
+export function buildStations(cif: CifFile, served: Set<string>, changeTimes = new Map<string, number>()): Station[] {
   const byCrs = new Map<string, Station>();
   for (const t of cif.tiplocs.values()) {
     if (!t.crs || !served.has(t.crs) || byCrs.has(t.crs)) continue;
-    byCrs.set(t.crs, { crs: t.crs, name: titleCase(t.name) });
+    const station: Station = { crs: t.crs, name: titleCase(t.name) };
+    const change = changeTimes.get(t.crs);
+    if (change !== undefined) station.change = change;
+    byCrs.set(t.crs, station);
   }
   return [...byCrs.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

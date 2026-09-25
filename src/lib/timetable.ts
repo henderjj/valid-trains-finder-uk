@@ -5,6 +5,8 @@ export interface Station {
   /** Three-letter CRS code, e.g. "LGE". */
   crs: string;
   name: string;
+  /** Minimum minutes to change trains here, when the timetable gives one. */
+  change?: number;
 }
 
 /**

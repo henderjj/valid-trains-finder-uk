@@ -184,3 +184,18 @@ export function toConnections(schedules: Schedule[]): Connection[] {
   }
   return out.sort((a, b) => a.dep - b.dep || a.arr - b.arr);
 }
+
+/**
+ * Minimum connection times, in minutes, by CRS code, from the master station names file
+ * (.MSN). Station records ("A") hold the CRS code at columns 50-52 and the time at 64-65.
+ */
+export function parseChangeTimes(lines: Iterable<string>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const l of lines) {
+    if (!l.startsWith('A    ')) continue;
+    const crs = l.slice(49, 52).trim();
+    const time = l.slice(63, 65).trim();
+    if (/^[A-Z]{3}$/.test(crs) && /^\d+$/.test(time) && !out.has(crs)) out.set(crs, Number(time));
+  }
+  return out;
+}

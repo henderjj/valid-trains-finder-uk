@@ -274,6 +274,27 @@ select {
   font-weight: 600;
 }
 
+.segmented.trip {
+  margin-top: 1.5rem;
+}
+
+.half {
+  margin: 0;
+}
+
+.with-clear {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.with-clear .clear {
+  flex: none;
+  width: 2.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
 .check {
   display: flex;
   align-items: center;
