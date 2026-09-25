@@ -31,12 +31,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Download timetable feed
-        run: npm run data:download -- timetable
+      - name: Download timetable and fares feeds
+        run: npm run data:download -- timetable fares
         env:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
-      - name: Build timetable data
+      - name: Build timetable and fares data
         run: npm run data:build -- "" "${{ inputs.days || '28' }}"
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5

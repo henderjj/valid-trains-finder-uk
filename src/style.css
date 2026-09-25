@@ -7,6 +7,7 @@
   --accent: #1f4e79;
   --accent-text: #ffffff;
   --error: #b3261e;
+  --ok: #1b6e3a;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -23,6 +24,7 @@
     --accent: #6fa8dc;
     --accent-text: #0b1520;
     --error: #f2b8b5;
+    --ok: #8fd6a5;
   }
 }
 
@@ -225,5 +227,87 @@ button {
 footer {
   margin-top: 3rem;
   font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ticket {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: var(--surface);
+  border-radius: 0.5rem;
+}
+
+.ticket .hint {
+  margin: 0;
+}
+
+select {
+  width: 100%;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.segmented button {
+  padding: 0.55rem;
+  border: 0;
+  background: var(--bg);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-weight: 400;
+  font-size: 1rem;
+}
+
+.check input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.validity {
+  grid-column: 1 / -1;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.validity.ok {
+  color: var(--ok);
+}
+
+.validity.no {
+  color: var(--error);
+}
+
+.reason {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.journey.invalid .times {
   color: var(--muted);
 }
