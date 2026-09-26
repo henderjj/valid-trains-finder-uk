@@ -3,7 +3,7 @@ import type { RouteFares, Trip } from './App.tsx';
 import { ukToday } from './lib/data.ts';
 import { checkReturnDate, describeTicketRules, fareValidity, restrictionSetFor, type FareOption, type Validity } from './lib/fares.ts';
 import { operatorName } from './lib/operators.ts';
-import { clock, duration, type Journey, type Station } from './lib/timetable.ts';
+import { clock, duration, stationName, type Journey, type Station } from './lib/timetable.ts';
 
 interface Props {
   from: Station;
@@ -100,7 +100,7 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
         </div>
       )}
       <h2>
-        {start.name} → {end.name}
+        {stationName(start)} → {stationName(end)}
       </h2>
       <p class="hint">
         {longDate(day)} · {summary}
@@ -127,7 +127,7 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
           ) : (
             <div class="field">
               <label for="ticket">
-                {coming ? `Single from ${to.name}` : leg === 'O' ? `Ticket from ${from.name}` : `Return ticket from ${to.name}`}
+                {coming ? `Single from ${stationName(to)}` : leg === 'O' ? `Ticket from ${stationName(from)}` : `Return ticket from ${stationName(to)}`}
               </label>
               <select
                 id="ticket"

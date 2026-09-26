@@ -199,3 +199,23 @@ export function parseChangeTimes(lines: Iterable<string>): Map<string, number> {
   }
   return out;
 }
+
+/**
+ * Station names by CRS code from the master station names file (.MSN): columns 6-35 of the
+ * station record, which can be fuller than the timetable's 26-character location names.
+ * A station's own record (interchange type 0-3) wins over its extra locations (type 9).
+ */
+export function parseStationNames(lines: Iterable<string>): Map<string, string> {
+  const out = new Map<string, string>();
+  const main = new Set<string>();
+  for (const l of lines) {
+    if (!l.startsWith('A    ')) continue;
+    const crs = l.slice(49, 52).trim();
+    const name = l.slice(5, 35).trim();
+    if (!/^[A-Z]{3}$/.test(crs) || !name || main.has(crs)) continue;
+    if (l[35] !== '9') main.add(crs);
+    else if (out.has(crs)) continue;
+    out.set(crs, name);
+  }
+  return out;
+}

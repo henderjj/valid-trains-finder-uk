@@ -6,7 +6,7 @@ import type { FareOption, RestrictionSet } from './lib/fares.ts';
 import { registerOperators } from './lib/operators.ts';
 import { planJourneysInBackground } from './lib/plan.ts';
 import type { Routeing } from './lib/routeing.ts';
-import type { DataMeta, Journey, Station } from './lib/timetable.ts';
+import { stationName, type DataMeta, type Journey, type Station } from './lib/timetable.ts';
 
 interface Route {
   from: Station;
@@ -204,7 +204,7 @@ export function App() {
                     if (!outOfRange && !returnTooEarly) void search(r, date, returnDate);
                   }}
                 >
-                  {r.from.name} → {r.to.name}
+                  {stationName(r.from)} → {stationName(r.to)}
                 </button>
               </li>
             ))}

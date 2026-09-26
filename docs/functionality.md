@@ -24,7 +24,11 @@ After the first visit, the app itself works offline. Data files (timetables, far
   2. Names that start with what you typed.
   3. Names with a word that starts with it.
   4. Names that contain it.
-- Use the arrow keys and Enter to pick a suggestion, or Escape to close the list.
+- Use the arrow keys and Enter to pick a suggestion, or Escape to close the list. Picking a suggestion only fills in that box: it never opens the next field (such as the date picker) that was underneath the list.
+- Some stations share a name in the timetable. When they do, the app first uses the fuller name from the timetable's master station list (for example "Whitchurch (Hants)"). Any that still share a name get a note, shown in the suggestions, in the chosen station's box, in the results and in recent routes:
+  - **main station**: the one with the most trains calling over the data's 12 weeks. It is listed first.
+  - **other station**: another station of that name with trains.
+  - **bus stop**: only buses call there (for example rail replacement buses).
 - The **⇅** button swaps From and To.
 
 ### Date

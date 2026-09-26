@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseChangeTimes, parseCif, schedulesForDate, toConnections } from '../pipeline/cif.ts';
+import { parseChangeTimes, parseCif, parseStationNames, schedulesForDate, toConnections } from '../pipeline/cif.ts';
 
 const cif = parseCif(readFileSync(new URL('./fixtures/sample.MCA', import.meta.url), 'utf8'));
 
@@ -60,5 +60,17 @@ describe('parseChangeTimes', () => {
       'L    DERBY                         DERBY',
     ];
     expect(parseChangeTimes(lines)).toEqual(new Map([['DBY', 6], ['CLJ', 10]]));
+  });
+});
+
+describe('parseStationNames', () => {
+  it("prefers a station's own record over its extra locations", () => {
+    const lines = [
+      'A                             FILE-SPEC=05 1.00 22/09/26 18.08.01   969',
+      'A    DERBY                         2DRBY   DBY   DBY14362 63356 6',
+      'A    CLAPHAM JN SIDINGS            9CLPHMJ1CLJ   CLJ15272 6175510',
+      'A    CLAPHAM JUNCTION              2CLPHMJCCLJ   CLJ15272 6175505',
+    ];
+    expect(parseStationNames(lines)).toEqual(new Map([['DBY', 'DERBY'], ['CLJ', 'CLAPHAM JUNCTION']]));
   });
 });
