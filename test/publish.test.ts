@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseCif } from '../pipeline/cif.ts';
-import { buildDay, buildStations, crsByTiploc, distinguish, titleCase } from '../pipeline/publish.ts';
+import { buildDay, buildGroups, buildStations, cityName, crsByTiploc, distinguish, titleCase } from '../pipeline/publish.ts';
 import { callsOf, clock, duration, findDirect } from '../src/lib/timetable.ts';
 
 const cif = parseCif(readFileSync(new URL('./fixtures/sample.MCA', import.meta.url), 'utf8'));
@@ -75,6 +75,21 @@ describe('stations', () => {
       { crs: 'EEE', name: 'Upton', note: 'bus stop' },
       { crs: 'FFF', name: 'Derby' },
     ]);
+  });
+
+  it('offers fare groups as cities, with the stations trains call at', () => {
+    expect(cityName('MANCHESTER STNS')).toBe('Manchester');
+    expect(cityName('LONDON TERMINALS')).toBe('London');
+    const stations = [{ crs: 'MAN', name: 'Manchester Piccadilly' }, { crs: 'MCO', name: 'Manchester Oxford Road' }, { crs: 'SHF', name: 'Sheffield' }];
+    expect(
+      buildGroups(
+        [
+          { code: '0438', name: 'MANCHESTER STNS', members: ['MAN', 'MCO', 'XXX'] },
+          { code: '0999', name: 'SHEFFIELD STNS', members: ['SHF', 'YYY'] },
+        ],
+        stations,
+      ),
+    ).toEqual([{ crs: '0438', name: 'Manchester', note: 'all stations', members: ['MAN', 'MCO'] }]);
   });
 
   it('title-cases names', () => {

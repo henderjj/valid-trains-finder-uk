@@ -86,17 +86,17 @@ function firstFrom(dep: Int32Array, t: number): number {
 }
 
 /**
- * The earliest-arriving journey leaving `from` at or after `after`, using the fewest trains
- * among those arriving earliest, or null when there is none.
+ * The earliest-arriving journey leaving any of `from` at or after `after` for any of `to`,
+ * using the fewest trains among those arriving earliest, or null when there is none.
  */
-function earliest(net: Network, from: number, to: number, after: number, opts: Required<PlanOptions>, scratch: Scratch): Journey | null {
+function earliest(net: Network, from: number[], to: number[], after: number, opts: Required<PlanOptions>, scratch: Scratch): Journey | null {
   const { maxLegs, maxDuration } = opts;
   const n = net.stations.size;
-  const { best, board, via, change } = scratch;
+  const { best, board, via, change, target: isTarget } = scratch;
   best.fill(NONE);
   board.fill(-1);
   // best[k * n + s]: earliest arrival at s using exactly k trains; k = 0 is the origin itself.
-  best[from] = after;
+  for (const s of from) best[s] = after;
   let target = NONE;
   const limit = after + maxDuration;
 
@@ -122,15 +122,17 @@ function earliest(net: Network, from: number, to: number, after: number, opts: R
       best[slot] = net.arr[c];
       via[slot * 2] = board[t * 2];
       via[slot * 2 + 1] = c;
-      if (net.to[c] === to && net.arr[c] < target) target = net.arr[c];
+      if (isTarget[net.to[c]] && net.arr[c] < target) target = net.arr[c];
     }
   }
   if (target === NONE) return null;
 
   let k = 1;
-  while (best[k * n + to] !== target) k++;
+  let end = -1;
+  for (; end === -1; k++) end = to.find((s) => best[k * n + s] === target) ?? -1;
+  k--;
   const legs: Leg[] = [];
-  for (let s = to; k > 0; k--) {
+  for (let s = end; k > 0; k--) {
     const slot = k * n + s;
     const enter = via[slot * 2];
     const exit = via[slot * 2 + 1];
@@ -158,6 +160,8 @@ interface Scratch {
   via: Int32Array;
   /** Minutes needed to change trains at each station. */
   change: Int32Array;
+  /** 1 for each destination station. */
+  target: Uint8Array;
 }
 
 const DEFAULTS: Required<PlanOptions> = { maxLegs: 3, changeTime: 5, changeTimes: {}, maxDuration: 12 * 60 };
@@ -167,13 +171,31 @@ const DEFAULTS: Required<PlanOptions> = { maxLegs: 3, changeTime: 5, changeTimes
  * direct train, plus the fastest journey with changes for each departure through the day.
  * A journey with changes is dropped when another leaves no earlier, arrives no later and has
  * no more changes.
+ *
+ * Either end can be several stations (a city's stations): journeys then run from any of the
+ * first to any of the second, and a direct train calling at more than one of them is listed
+ * once, boarding at the last it calls at and leaving at the first.
  */
-export function planJourneys(net: Network, day: DayFile, fromCrs: string, toCrs: string, options: PlanOptions = {}): Journey[] {
+export function planJourneys(net: Network, day: DayFile, fromCrs: string | string[], toCrs: string | string[], options: PlanOptions = {}): Journey[] {
   const opts = { ...DEFAULTS, ...options };
-  const direct: Journey[] = findDirect(day, fromCrs, toCrs).map((leg) => ({ legs: [leg], dep: leg.dep, arr: leg.arr }));
-  const from = net.stations.get(fromCrs);
-  const to = net.stations.get(toCrs);
-  if (from === undefined || to === undefined || from === to) return direct;
+  const toList = [toCrs].flat();
+  const fromList = [fromCrs].flat().filter((c) => !toList.includes(c));
+  const legs: Leg[] = [];
+  for (const f of fromList) {
+    for (const t of toList) {
+      for (const leg of findDirect(day, f, t)) {
+        // The same run of a train, found from another of the stations.
+        const i = legs.findIndex((l) => l.uid === leg.uid && l.dep <= leg.arr && leg.dep <= l.arr);
+        if (i === -1) legs.push(leg);
+        else if (leg.arr - leg.dep < legs[i].arr - legs[i].dep) legs[i] = leg;
+      }
+    }
+  }
+  const direct: Journey[] = legs.sort((a, b) => a.dep - b.dep || a.arr - b.arr).map((leg) => ({ legs: [leg], dep: leg.dep, arr: leg.arr }));
+  const index = (codes: string[]) => codes.flatMap((c) => net.stations.get(c) ?? []);
+  const from = index(fromList);
+  const to = index(toList);
+  if (!from.length || !to.length) return direct;
 
   const n = net.stations.size;
   const scratch: Scratch = {
@@ -181,7 +203,9 @@ export function planJourneys(net: Network, day: DayFile, fromCrs: string, toCrs:
     board: new Int32Array(net.trains.length * 2),
     via: new Int32Array((opts.maxLegs + 1) * n * 2),
     change: new Int32Array(n).fill(opts.changeTime),
+    target: new Uint8Array(n),
   };
+  for (const t of to) scratch.target[t] = 1;
   for (const [crs, i] of net.stations) {
     const minutes = opts.changeTimes[crs];
     if (minutes !== undefined) scratch.change[i] = minutes;

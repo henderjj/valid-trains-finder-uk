@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Results } from './Results.tsx';
 import { StationInput } from './StationInput.tsx';
-import { loadFares, loadMeta, loadOperators, loadRestrictions, loadRouteing, loadStations, ukToday } from './lib/data.ts';
+import { loadFares, loadGroups, loadMeta, loadOperators, loadRestrictions, loadRouteing, loadStations, ukToday } from './lib/data.ts';
 import type { FareOption, RestrictionSet } from './lib/fares.ts';
 import { registerOperators } from './lib/operators.ts';
 import { planJourneysInBackground } from './lib/plan.ts';
 import type { Routeing } from './lib/routeing.ts';
-import { stationName, type DataMeta, type Journey, type Station } from './lib/timetable.ts';
+import { stationCodes, stationName, type DataMeta, type Journey, type Station } from './lib/timetable.ts';
 
 interface Route {
   from: Station;
@@ -50,13 +50,16 @@ export interface RouteFares {
   routeing: Routeing | null;
 }
 
-/** Fares are optional: without them the app still lists trains. */
+/**
+ * Fares are optional: without them the app still lists trains. A city's group has fares of
+ * its own (such as Manchester Stations to London Terminals), valid from any of its stations.
+ */
 const loadRouteFares = (route: Route): Promise<RouteFares | null> =>
   Promise.all([
     loadFares(route.from.crs, route.to.crs),
     loadFares(route.to.crs, route.from.crs),
     loadRestrictions(),
-    loadRouteing(route.from.crs, route.to.crs).catch(() => null),
+    loadRouteing(stationCodes(route.from), stationCodes(route.to)).catch(() => null),
   ])
     .then(([out, back, sets, routeing]) => ({
       out,
@@ -81,6 +84,9 @@ export interface Trip {
 
 export function App() {
   const [stations, setStations] = useState<Station[]>([]);
+  const [groups, setGroups] = useState<Station[]>([]);
+  // Groups come first, so "Manchester (all stations)" is suggested above its stations.
+  const places = useMemo(() => [...groups, ...stations], [groups, stations]);
   const [meta, setMeta] = useState<DataMeta | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [from, setFrom] = useState<Station | null>(null);
@@ -91,10 +97,11 @@ export function App() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
   useEffect(() => {
-    Promise.all([loadStations(), loadMeta(), loadOperators()])
-      .then(([s, m, operators]) => {
+    Promise.all([loadStations(), loadMeta(), loadOperators(), loadGroups()])
+      .then(([s, m, operators, g]) => {
         registerOperators(operators);
         setStations(s);
+        setGroups(g);
         setMeta(m);
       })
       .catch((err: Error) => setLoadError(err.message));
@@ -104,8 +111,8 @@ export function App() {
     setStatus({ kind: 'loading' });
     try {
       const [journeys, backJourneys, fares] = await Promise.all([
-        planJourneysInBackground(day, route.from.crs, route.to.crs),
-        returnDay ? planJourneysInBackground(returnDay, route.to.crs, route.from.crs) : null,
+        planJourneysInBackground(day, stationCodes(route.from), stationCodes(route.to)),
+        returnDay ? planJourneysInBackground(returnDay, stationCodes(route.to), stationCodes(route.from)) : null,
         loadRouteFares(route),
       ]);
       const back = backJourneys ? { date: returnDay, journeys: backJourneys } : undefined;
@@ -137,7 +144,7 @@ export function App() {
           if (from && to && canSearch) void search({ from, to }, date, returnDate);
         }}
       >
-        <StationInput label="From" stations={stations} value={from} onChange={setFrom} />
+        <StationInput label="From" stations={places} value={from} onChange={setFrom} />
         <button
           type="button"
           class="swap"
@@ -149,7 +156,7 @@ export function App() {
         >
           ⇅
         </button>
-        <StationInput label="To" stations={stations} value={to} onChange={setTo} />
+        <StationInput label="To" stations={places} value={to} onChange={setTo} />
         <div class="field">
           <label for="date">Date</label>
           <input

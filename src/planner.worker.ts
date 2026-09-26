@@ -6,8 +6,9 @@ import { buildNetwork, planJourneys, type Network } from './lib/planner.ts';
 export interface PlanRequest {
   id: number;
   date: string;
-  from: string;
-  to: string;
+  /** CRS codes of the stations to leave from and to arrive at. */
+  from: string[];
+  to: string[];
 }
 
 export type PlanResponse = { id: number; journeys: import('./lib/timetable.ts').Journey[] } | { id: number; error: string };

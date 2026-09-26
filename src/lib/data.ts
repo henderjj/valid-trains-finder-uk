@@ -14,6 +14,8 @@ async function getJson<T>(path: string): Promise<T> {
 
 export const loadMeta = () => getJson<DataMeta>('meta.json');
 export const loadStations = () => getJson<Station[]>('stations.json');
+/** Cities' fare groups, offered as "all stations" places; empty when not published. */
+export const loadGroups = () => getJson<Station[]>('groups.json').catch(() => []);
 /** Operator names from the fares feed, by timetable code; empty when not published. */
 export const loadOperators = () => getJson<Record<string, string>>('operators.json').catch(() => ({}));
 
@@ -56,13 +58,14 @@ const loadRouteingData = once(() => getJson<RouteingData>('routeing.json'));
 const routeFiles = new Map<string, Promise<PermittedRoutes>>();
 
 /**
- * The routeing guide, with the permitted routes a journey between two stations needs, or
- * null when the data isn't published.
+ * The routeing guide, with the permitted routes journeys between any of `from` and any of
+ * `to` (CRS codes) need, or null when the data isn't published.
  */
-export async function loadRouteing(from: string, to: string): Promise<Routeing | null> {
+export async function loadRouteing(from: string[], to: string[]): Promise<Routeing | null> {
   const data = await loadRouteingData().catch(() => null);
   if (!data) return null;
-  const codes = new Routeing(data, new Map()).routeFiles(from, to);
+  const guide = new Routeing(data, new Map());
+  const codes = [...new Set(from.flatMap((f) => to.flatMap((t) => guide.routeFiles(f, t))))];
   const routes = await Promise.all(
     codes.map(async (code) => {
       let file = routeFiles.get(code);

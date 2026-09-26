@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'preact/hooks';
 import { searchStations } from './lib/data.ts';
-import type { Station } from './lib/timetable.ts';
+import { stationName, type Station } from './lib/timetable.ts';
 
 interface Props {
   label: string;
@@ -31,7 +31,9 @@ export function StationInput({ label, stations, value, onChange }: Props) {
   const [text, setText] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
-  const shown = text ?? (value ? `${value.name} (${value.note ? `${value.note}, ` : ''}${value.crs})` : '');
+  // A city's group has no station code to show.
+  const describe = (s: Station) => (s.members ? stationName(s) : `${s.name} (${s.note ? `${s.note}, ` : ''}${s.crs})`);
+  const shown = text ?? (value ? describe(value) : '');
   const found = useMemo(() => (text ? searchStations(stations, text) : []), [stations, text]);
   const matches = focused ? found : [];
 
@@ -96,7 +98,7 @@ export function StationInput({ label, stations, value, onChange }: Props) {
                 {s.name}
                 {s.note && <span class="note"> {s.note}</span>}
               </span>
-              <span class="crs">{s.crs}</span>
+              {!s.members && <span class="crs">{s.crs}</span>}
             </li>
           ))}
         </ul>

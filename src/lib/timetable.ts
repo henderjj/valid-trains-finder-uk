@@ -7,9 +7,20 @@ export interface Station {
   name: string;
   /** Minimum minutes to change trains here, when the timetable gives one. */
   change?: number;
-  /** Tells apart stations that share a name: "main station", "other station" or "bus stop". */
+  /**
+   * Tells apart stations that share a name: "main station", "other station" or "bus stop".
+   * "all stations" marks a city's fare group (see `members`).
+   */
   note?: string;
+  /**
+   * For a city's fare group, such as London Terminals, the CRS codes of its stations. `crs`
+   * is then the group's fare location code, not a station code.
+   */
+  members?: string[];
 }
+
+/** The stations a place stands for: a group's members, or the station itself. */
+export const stationCodes = (s: Station) => s.members ?? [s.crs];
 
 /** A station's name with its note, if it has one, e.g. "Whitchurch (main station)". */
 export const stationName = (s: Station) => (s.note ? `${s.name} (${s.note})` : s.name);

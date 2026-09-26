@@ -1,6 +1,7 @@
 // Turns parsed timetable data into the published day files and station list.
 import type { DayFile, DayTrain, Station } from '../src/lib/timetable.ts';
 import { schedulesForDate, type CifFile, type Schedule } from './cif.ts';
+import type { FareGroup } from './fares.ts';
 
 /** Passenger trains and buses, including their short-term-planning variants. */
 const PASSENGER = new Set(['P', '1', 'B', '5']);
@@ -140,4 +141,19 @@ export function distinguish(stations: Station[], names: Map<string, string>, tra
     const busiest = trains.reduce<Station | null>((best, s) => (best && calls(best) >= calls(s) ? best : s), null);
     for (const s of list) s.note = calls(s) === 0 ? 'bus stop' : s === busiest ? 'main station' : 'other station';
   }
+}
+
+/** "MANCHESTER STNS" -> "Manchester", "LONDON TERMINALS" -> "London". */
+export const cityName = (groupName: string) => titleCase(groupName.replace(/\s+(?:STNS|STATIONS|STATION|TERMINALS)$/i, ''));
+
+/**
+ * The fare groups to offer as "all stations" places: each with at least two stations that
+ * trains call at, named after its city and sorted by name.
+ */
+export function buildGroups(groups: FareGroup[], stations: Station[]): (Station & { members: string[] })[] {
+  const served = new Set(stations.map((s) => s.crs));
+  return groups
+    .map((g) => ({ crs: g.code, name: cityName(g.name), note: 'all stations', members: g.members.filter((m) => served.has(m)) }))
+    .filter((g) => g.members.length > 1)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

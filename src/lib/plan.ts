@@ -25,7 +25,8 @@ function getWorker(): Worker {
   return worker;
 }
 
-export function planJourneysInBackground(date: string, from: string, to: string): Promise<Journey[]> {
+/** Journeys between two places, each given as the CRS codes of its stations. */
+export function planJourneysInBackground(date: string, from: string[], to: string[]): Promise<Journey[]> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
     pending.set(id, { resolve, reject });
