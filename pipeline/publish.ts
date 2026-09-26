@@ -86,11 +86,22 @@ export function titleCase(name: string): string {
     .replace(/[a-z][a-z']*/g, (w) => (KEEP_UPPER.has(w.toUpperCase()) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)));
 }
 
+export interface StationExtras {
+  /** Minimum minutes to change trains, by CRS code. */
+  changeTimes?: Map<string, number>;
+  /** Names from the master station names file, by CRS code. */
+  names?: Map<string, string>;
+  /** Calls by trains (not buses) over the days built, by CRS code. */
+  trainCalls?: Map<string, number>;
+}
+
 /**
  * One entry per CRS code that trains actually call at, sorted by name, with the station's
- * minimum connection time where the timetable gives one.
+ * minimum connection time where the timetable gives one. Stations that share a name are
+ * told apart (see `distinguish`).
  */
-export function buildStations(cif: CifFile, served: Set<string>, changeTimes = new Map<string, number>()): Station[] {
+export function buildStations(cif: CifFile, served: Set<string>, extras: StationExtras = {}): Station[] {
+  const { changeTimes = new Map(), names = new Map(), trainCalls = new Map() } = extras;
   const byCrs = new Map<string, Station>();
   for (const t of cif.tiplocs.values()) {
     if (!t.crs || !served.has(t.crs) || byCrs.has(t.crs)) continue;
@@ -99,5 +110,34 @@ export function buildStations(cif: CifFile, served: Set<string>, changeTimes = n
     if (change !== undefined) station.change = change;
     byCrs.set(t.crs, station);
   }
-  return [...byCrs.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const stations = [...byCrs.values()];
+  distinguish(stations, names, trainCalls);
+  const rank = (s: Station) => (s.note === 'main station' ? 0 : s.note === 'bus stop' ? 2 : 1);
+  return stations.sort((a, b) => a.name.localeCompare(b.name) || rank(a) - rank(b));
+}
+
+const sharedNames = (stations: Station[]) => {
+  const byName = new Map<string, Station[]>();
+  for (const s of stations) byName.set(s.name, [...(byName.get(s.name) ?? []), s]);
+  return [...byName.values()].filter((list) => list.length > 1);
+};
+
+/**
+ * Stations that share a timetable name first take their name from the master station names
+ * file, which often says more. Any that still share a name get a note: "bus stop" when only
+ * buses call, "main station" for the one with the most trains, and "other station" for the rest.
+ */
+export function distinguish(stations: Station[], names: Map<string, string>, trainCalls: Map<string, number>) {
+  for (const list of sharedNames(stations)) {
+    for (const s of list) {
+      const name = names.get(s.crs);
+      if (name) s.name = titleCase(name);
+    }
+  }
+  for (const list of sharedNames(stations)) {
+    const calls = (s: Station) => trainCalls.get(s.crs) ?? 0;
+    const trains = list.filter((s) => calls(s) > 0);
+    const busiest = trains.reduce<Station | null>((best, s) => (best && calls(best) >= calls(s) ? best : s), null);
+    for (const s of list) s.note = calls(s) === 0 ? 'bus stop' : s === busiest ? 'main station' : 'other station';
+  }
 }

@@ -9,13 +9,29 @@ interface Props {
   onChange: (station: Station | null) => void;
 }
 
+/**
+ * A tap on a suggestion picks it at once, so the list closes before the tap ends. The
+ * browser then sends the tap's click to whatever was under the list, such as the date box,
+ * which would open. This drops that stray click.
+ */
+function ignoreStrayClick() {
+  const stop = (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  for (const type of ['mousedown', 'click']) document.addEventListener(type, stop, true);
+  setTimeout(() => {
+    for (const type of ['mousedown', 'click']) document.removeEventListener(type, stop, true);
+  }, 500);
+}
+
 /** Text box with a suggestion list; accepts a station name or its three-letter code. */
 export function StationInput({ label, stations, value, onChange }: Props) {
   const id = useId();
   const [text, setText] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
-  const shown = text ?? (value ? `${value.name} (${value.crs})` : '');
+  const shown = text ?? (value ? `${value.name} (${value.note ? `${value.note}, ` : ''}${value.crs})` : '');
   const found = useMemo(() => (text ? searchStations(stations, text) : []), [stations, text]);
   const matches = focused ? found : [];
 
@@ -72,10 +88,14 @@ export function StationInput({ label, stations, value, onChange }: Props) {
               aria-selected={i === active}
               onPointerDown={(e) => {
                 e.preventDefault();
+                ignoreStrayClick();
                 choose(s);
               }}
             >
-              <span>{s.name}</span>
+              <span>
+                {s.name}
+                {s.note && <span class="note"> {s.note}</span>}
+              </span>
               <span class="crs">{s.crs}</span>
             </li>
           ))}

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseCif } from '../pipeline/cif.ts';
-import { buildDay, buildStations, crsByTiploc, titleCase } from '../pipeline/publish.ts';
+import { buildDay, buildStations, crsByTiploc, distinguish, titleCase } from '../pipeline/publish.ts';
 import { callsOf, clock, duration, findDirect } from '../src/lib/timetable.ts';
 
 const cif = parseCif(readFileSync(new URL('./fixtures/sample.MCA', import.meta.url), 'utf8'));
@@ -54,7 +54,27 @@ describe('stations', () => {
       { crs: 'LGE', name: 'Long Eaton' },
       { crs: 'SHF', name: 'Sheffield' },
     ]);
-    expect(buildStations(cif, new Set(['LGE']), new Map([['LGE', 5]]))).toEqual([{ crs: 'LGE', name: 'Long Eaton', change: 5 }]);
+    expect(buildStations(cif, new Set(['LGE']), { changeTimes: new Map([['LGE', 5]]) })).toEqual([{ crs: 'LGE', name: 'Long Eaton', change: 5 }]);
+  });
+
+  it('tells apart stations that share a name', () => {
+    const stations = [
+      { crs: 'AAA', name: 'Whitchurch' },
+      { crs: 'BBB', name: 'Whitchurch' },
+      { crs: 'CCC', name: 'Upton' },
+      { crs: 'DDD', name: 'Upton' },
+      { crs: 'EEE', name: 'Upton' },
+      { crs: 'FFF', name: 'Derby' },
+    ];
+    distinguish(stations, new Map([['AAA', 'WHITCHURCH (HANTS)'], ['BBB', 'WHITCHURCH (SHROPS)'], ['FFF', 'DERBY MIDLAND']]), new Map([['CCC', 10], ['DDD', 40], ['FFF', 5]]));
+    expect(stations).toEqual([
+      { crs: 'AAA', name: 'Whitchurch (Hants)' },
+      { crs: 'BBB', name: 'Whitchurch (Shrops)' },
+      { crs: 'CCC', name: 'Upton', note: 'other station' },
+      { crs: 'DDD', name: 'Upton', note: 'main station' },
+      { crs: 'EEE', name: 'Upton', note: 'bus stop' },
+      { crs: 'FFF', name: 'Derby' },
+    ]);
   });
 
   it('title-cases names', () => {

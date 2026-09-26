@@ -12,7 +12,7 @@ import { createInterface } from 'node:readline';
 import { gzipSync } from 'node:zlib';
 import type { FaresMeta } from '../src/lib/fares.ts';
 import type { DataMeta } from '../src/lib/timetable.ts';
-import { CifParser, parseChangeTimes, type CifFile } from './cif.ts';
+import { CifParser, parseChangeTimes, parseStationNames, type CifFile } from './cif.ts';
 import { routeOperators } from '../src/lib/fares.ts';
 import { operatorName, registerOperators } from '../src/lib/operators.ts';
 import { annotations, checkData, summary, type BuildSummary } from './checks.ts';
@@ -134,6 +134,7 @@ async function main() {
   await mkdir(`${OUT}/days`, { recursive: true });
   const crsOf = crsByTiploc(cif);
   const served = new Set<string>();
+  const trainCalls = new Map<string, number>();
   const operators = new Set<string>();
   const dayCounts: BuildSummary['days'] = [];
 
@@ -143,7 +144,11 @@ async function main() {
     const day = buildDay(cif, date, crsOf);
     for (const t of day.trains) {
       operators.add(t.o);
-      for (let i = 0; i < t.c.length; i += 3) served.add(t.c[i] as string);
+      for (let i = 0; i < t.c.length; i += 3) {
+        const crs = t.c[i] as string;
+        served.add(crs);
+        if (!t.b) trainCalls.set(crs, (trainCalls.get(crs) ?? 0) + 1);
+      }
     }
     dayCounts.push({ date, trains: day.trains.length });
     const json = JSON.stringify(day);
@@ -152,14 +157,17 @@ async function main() {
   }
 
   // Stations without a minimum connection time use the planner's default.
-  const changeTimes = parseChangeTimes(optionalMember('data/raw/timetable.zip', 'MSN'));
-  const stations = buildStations(cif, served, changeTimes);
+  const msn = optionalMember('data/raw/timetable.zip', 'MSN');
+  const changeTimes = parseChangeTimes(msn);
+  const stations = buildStations(cif, served, { changeTimes, names: parseStationNames(msn), trainCalls });
   await writeFile(`${OUT}/stations.json`, JSON.stringify(stations));
   const unusual = stations.filter((s) => s.change !== undefined && (s.change < 2 || s.change > 15));
   console.log(`Change times: ${stations.filter((s) => s.change !== undefined).length} stations; unusual: ${unusual.map((s) => `${s.crs} ${s.change}`).join(', ')}`);
   const meta: DataMeta = { built: new Date().toISOString(), from: start, to: addDays(start, days - 1) };
   await writeFile(`${OUT}/meta.json`, JSON.stringify(meta));
   console.log(`${stations.length} stations`);
+  const noted = stations.filter((s) => s.note);
+  console.log(`Stations sharing a name: ${noted.map((s) => `${s.name} ${s.crs} (${s.note})`).join(', ') || 'none'}`);
 
   const faresZip = 'data/raw/fares.zip';
   const fares = existsSync(faresZip) ? await buildFares(faresZip, start) : undefined;

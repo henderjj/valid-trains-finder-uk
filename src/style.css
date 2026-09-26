@@ -118,6 +118,11 @@ input:focus {
   background: var(--surface);
 }
 
+.suggestions .note {
+  color: var(--muted);
+  font-size: 0.875em;
+}
+
 .crs {
   color: var(--muted);
   font-variant-numeric: tabular-nums;

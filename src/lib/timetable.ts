@@ -7,7 +7,12 @@ export interface Station {
   name: string;
   /** Minimum minutes to change trains here, when the timetable gives one. */
   change?: number;
+  /** Tells apart stations that share a name: "main station", "other station" or "bus stop". */
+  note?: string;
 }
+
+/** A station's name with its note, if it has one, e.g. "Whitchurch (main station)". */
+export const stationName = (s: Station) => (s.note ? `${s.name} (${s.note})` : s.name);
 
 /**
  * One train on one day. `c` holds its public calls as flat triples of
