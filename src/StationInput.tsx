@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'preact/hooks';
+import { useId, useMemo, useRef, useState } from 'preact/hooks';
 import { searchStations } from './lib/data.ts';
 import { stationName, type Station } from './lib/timetable.ts';
 
@@ -10,9 +10,9 @@ interface Props {
 }
 
 /**
- * A tap on a suggestion picks it at once, so the list closes before the tap ends. The
- * browser then sends the tap's click to whatever was under the list, such as the date box,
- * which would open. This drops that stray click.
+ * A suggestion is picked as the tap ends, which closes the list before the browser sends the
+ * tap's click. The click would then land on whatever was under the list, such as the date
+ * box, which would open. This drops that stray click.
  */
 function ignoreStrayClick() {
   const stop = (e: Event) => {
@@ -31,6 +31,8 @@ export function StationInput({ label, stations, value, onChange }: Props) {
   const [text, setText] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
+  // Where a press on a suggestion started; cleared when the finger moves to scroll instead.
+  const press = useRef<{ crs: string; x: number; y: number } | null>(null);
   // A city's group has no station code to show.
   const describe = (s: Station) => (s.members ? stationName(s) : `${s.name} (${s.note ? `${s.note}, ` : ''}${s.crs})`);
   const shown = text ?? (value ? describe(value) : '');
@@ -89,7 +91,19 @@ export function StationInput({ label, stations, value, onChange }: Props) {
               role="option"
               aria-selected={i === active}
               onPointerDown={(e) => {
+                // Keeps the text box focused, so the list stays open.
                 e.preventDefault();
+                press.current = { crs: s.crs, x: e.clientX, y: e.clientY };
+              }}
+              onPointerMove={(e) => {
+                const p = press.current;
+                if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) press.current = null;
+              }}
+              onPointerCancel={() => (press.current = null)}
+              onPointerUp={() => {
+                // Only a tap picks: a press that became a scroll doesn't.
+                if (press.current?.crs !== s.crs) return;
+                press.current = null;
                 ignoreStrayClick();
                 choose(s);
               }}
