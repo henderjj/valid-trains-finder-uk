@@ -24,7 +24,7 @@ After the first visit, the app itself works offline. Data files (timetables, far
   2. Names that start with what you typed.
   3. Names with a word that starts with it.
   4. Names that contain it.
-- Use the arrow keys and Enter to pick a suggestion, or Escape to close the list. Picking a suggestion only fills in that box: it never opens the next field (such as the date picker) that was underneath the list.
+- Tap a suggestion to pick it, or use the arrow keys and Enter, or Escape to close the list. A touch that turns into a scroll doesn't pick anything, so the list (and the page behind it) can be scrolled with a finger on it. A long list scrolls inside itself. Picking a suggestion only fills in that box: it never opens the next field (such as the date picker) that was underneath the list.
 - Some stations share a name in the timetable. When they do, the app first uses the fuller name from the timetable's master station list (for example "Whitchurch (Hants)"). Any that still share a name get a note, shown in the suggestions, in the chosen station's box, in the results and in recent routes:
   - **main station**: the one with the most trains calling over the data's 12 weeks. It is listed first.
   - **other station**: another station of that name with trains.
@@ -34,7 +34,7 @@ After the first visit, the app itself works offline. Data files (timetables, far
 ### All stations in a city
 
 - Cities with several stations can be picked as a whole, for example **Manchester (all stations)** or **London (all stations)**. They are suggested above that city's single stations and have no station code.
-- The cities and their stations come from the fares feed's station groups (such as "Manchester Stns" and "London Terminals"), so they match how tickets are priced. A group is offered when trains call at two or more of its stations. Its name drops the words "Stns", "Stations" or "Terminals", so "London Terminals" becomes "London". The groups can be narrower than a city: London Terminals, for example, doesn't include Stratford.
+- The cities and their stations come from the fares feed's station groups (such as "Manchester Stns" and "London Terminals"), so they match how tickets are priced. A group is offered when trains call at two or more of its stations. Its name is the city's: the feed's words "Stns", "Stations" or "Terminals" are dropped, and so is a list of its stations, so "London Terminals" becomes "London" and "Bicester Nth/Vil" becomes "Bicester". The groups can be narrower than a city: London Terminals, for example, doesn't include Stratford.
 - A search from or to a city looks for journeys from any of its stations or to any of them, and each journey shows which stations it leaves from and arrives at.
 - A direct train that calls at more than one of the city's stations is listed once. It boards at the last of the origin city's stations it calls at, and leaves at the first of the destination city's stations it reaches.
 - A journey never starts at a station that is also one of the destinations, so, for example, Manchester (all stations) to Manchester Piccadilly finds journeys from Manchester's other stations.

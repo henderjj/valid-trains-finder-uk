@@ -80,6 +80,8 @@ describe('stations', () => {
   it('offers fare groups as cities, with the stations trains call at', () => {
     expect(cityName('MANCHESTER STNS')).toBe('Manchester');
     expect(cityName('LONDON TERMINALS')).toBe('London');
+    const names = ['BICESTER NTH/VIL', 'COLCHESTER/C TWN', 'PORTSMOUTH&S/HBR', 'CANTERBURY E/W', 'READING/R WEST', 'PENGE EAST/WEST', 'GAINSBORO CEN/LR', 'W HAMPSTEAD', 'BRADFORD YK', 'HEATHROW RAIL', 'BIRMINGHAM'];
+    expect(names.map(cityName)).toEqual(['Bicester', 'Colchester', 'Portsmouth', 'Canterbury', 'Reading', 'Penge', 'Gainsborough', 'West Hampstead', 'Bradford', 'Heathrow', 'Birmingham']);
     const stations = [{ crs: 'MAN', name: 'Manchester Piccadilly' }, { crs: 'MCO', name: 'Manchester Oxford Road' }, { crs: 'SHF', name: 'Sheffield' }];
     expect(
       buildGroups(

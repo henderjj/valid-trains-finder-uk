@@ -143,8 +143,30 @@ export function distinguish(stations: Station[], names: Map<string, string>, tra
   }
 }
 
-/** "MANCHESTER STNS" -> "Manchester", "LONDON TERMINALS" -> "London". */
-export const cityName = (groupName: string) => titleCase(groupName.replace(/\s+(?:STNS|STATIONS|STATION|TERMINALS)$/i, ''));
+/** Group names the fares feed shortens beyond what the general rules can undo. */
+const CITY_NAMES: Record<string, string> = {
+  'Bradford Yk': 'Bradford',
+  Gainsboro: 'Gainsborough',
+  'Heathrow Rail': 'Heathrow',
+  'W Hampstead': 'West Hampstead',
+};
+
+/**
+ * A fare group's name as a city: "MANCHESTER STNS" -> "Manchester", "LONDON TERMINALS" ->
+ * "London". Names listing their stations keep only the place: "BICESTER NTH/VIL" ->
+ * "Bicester", "COLCHESTER/C TWN" -> "Colchester", "PORTSMOUTH&S/HBR" -> "Portsmouth".
+ */
+export function cityName(groupName: string): string {
+  let name = titleCase(groupName.replace(/\s+(?:STNS|STATIONS|STATION|TERMINALS)$/i, '')).trim();
+  const cut = name.search(/[/&]/);
+  if (cut > 0) {
+    const words = name.slice(0, cut).trim().split(/\s+/);
+    // "Nth/Vil": the word before a slash is the first station's abbreviation.
+    if (name[cut] === '/' && words.length > 1) words.pop();
+    name = words.join(' ');
+  }
+  return CITY_NAMES[name] ?? name;
+}
 
 /**
  * The fare groups to offer as "all stations" places: each with at least two stations that
