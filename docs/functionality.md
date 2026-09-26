@@ -31,6 +31,15 @@ After the first visit, the app itself works offline. Data files (timetables, far
   - **bus stop**: only buses call there (for example rail replacement buses).
 - The **⇅** button swaps From and To.
 
+### All stations in a city
+
+- Cities with several stations can be picked as a whole, for example **Manchester (all stations)** or **London (all stations)**. They are suggested above that city's single stations and have no station code.
+- The cities and their stations come from the fares feed's station groups (such as "Manchester Stns" and "London Terminals"), so they match how tickets are priced. A group is offered when trains call at two or more of its stations. Its name drops the words "Stns", "Stations" or "Terminals", so "London Terminals" becomes "London". The groups can be narrower than a city: London Terminals, for example, doesn't include Stratford.
+- A search from or to a city looks for journeys from any of its stations or to any of them, and each journey shows which stations it leaves from and arrives at.
+- A direct train that calls at more than one of the city's stations is listed once. It boards at the last of the origin city's stations it calls at, and leaves at the first of the destination city's stations it reaches.
+- A journey never starts at a station that is also one of the destinations, so, for example, Manchester (all stations) to Manchester Piccadilly finds journeys from Manchester's other stations.
+- Tickets offered are the city group's own fares (for example Manchester Stations to London Terminals), which are valid from and to any station in the group. Fares priced only for one station of the city are not offered in a city search; search that station on its own to see them.
+
 ### Date
 
 - **Date** defaults to today (UK time).
@@ -58,7 +67,7 @@ Tick **Direct trains only** to hide journeys with changes. It is off by default,
 
 ### How journeys are found
 
-- **Every direct train** between the two stations is listed.
+- **Every direct train** between the two stations is listed (see [All stations in a city](#all-stations-in-a-city) for searches between cities).
 - **Journeys with changes** are found by searching the day's timetable for the earliest arrival from each departure time through the day. The search uses these limits:
   - At most **3 trains**, which means up to two changes.
   - At least the station's **minimum connection time** to change trains, from the timetable's station list (for example 6 minutes at Derby, 10 at Manchester Piccadilly and 15 at London King's Cross). Stations without one use 5 minutes.
@@ -169,6 +178,7 @@ These gaps mean a journey is sometimes marked not valid when it is in fact allow
 - The **Deploy** workflow rebuilds the data every Monday at 03:30 UTC and on every change to the app. It uses the latest timetable, fares and routeing guide feeds.
 - Before publishing, the build checks the data looks complete. It needs a typical day to have at least 15,000 trains and every day at least 5,000 (except Christmas Day and Boxing Day). It also needs at least 2,000 stations and 1,000 station connection times, the Anytime Single and Return ticket types, at least 2,000 fares files and 100 restriction codes, and at least 200 routeing points and 100 fare routes. If any check fails, nothing is published, so the app keeps the last good data, and GitHub reports the run as failed.
 - The build also warns, without stopping, about operators with no name and about ticket routes naming operators it can't read. The warnings show on the workflow run's page, and the fix is to add the names to `src/lib/operators.ts`.
+- The build log lists every station that got a same-name note and every city group with its stations.
 - The footer shows when the timetable data was last updated.
 - The footer also carries the credit "Contains data from National Rail Enquiries" and the not-official disclaimer.
 - If the fares or routeing data can't be loaded, the app still lists trains. It shows no ticket panel, or skips the permitted-route check.

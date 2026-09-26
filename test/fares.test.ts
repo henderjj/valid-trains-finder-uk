@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities, ticketKind } from '../pipeline/fares.ts';
+import { parseFareGroups, parseFares, parseLocations, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities, ticketKind } from '../pipeline/fares.ts';
 import {
   checkReturnDate,
   checkValidity,
@@ -282,5 +282,25 @@ describe('ticket validity periods', () => {
     expect(describeTicketRules(type('88', false))).toBe('No break of journey.');
     expect(describeTicketRules(type('29'))).toBe('Return within 2 days, counting the outward day, but not on the outward day. No break of journey.');
     expect(describeTicketRules(type('58'))).toBe('Return within 4 days, counting the outward day, not before Sunday. Break of journey allowed on the return journey only.');
+  });
+});
+
+describe('fare groups', () => {
+  const grouped = [
+    rec([0, 'RL'], [9, OPEN], [17, '03092026'], [36, '0438'], [40, 'MANCHESTER STNS']),
+    rec([0, 'RL'], [9, OPEN], [17, '03092026'], [36, '2968'], [40, 'MANCHESTER PICC'], [56, 'MAN'], [69, '0438']),
+    rec([0, 'RL'], [9, OPEN], [17, '03092026'], [36, '2963'], [40, 'MANCHESTER OXF R'], [56, 'MCO'], [69, '0438']),
+    rec([0, 'RL'], [9, '01012026'], [17, '03092020'], [36, '2966'], [40, 'MANCHESTER OLD'], [56, 'MCX'], [69, '0438']),
+    ...loc,
+  ];
+
+  it('lists groups with their current stations', () => {
+    expect(parseFareGroups(grouped, DATE)).toEqual([{ code: '0438', name: 'MANCHESTER STNS', members: ['MAN', 'MCO'] }]);
+  });
+
+  it('makes each group a fare location of its own', () => {
+    const locations = parseLocations(grouped, [...fsc, rec([0, 'RQ999'], [5, '0438'], [9, OPEN], [17, '10041999'])], DATE);
+    expect(locations['0438']).toEqual(['0438', 'Q999']);
+    expect(locations.MAN).toEqual(['2968', '0438', 'Q999']);
   });
 });

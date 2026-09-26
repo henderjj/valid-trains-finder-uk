@@ -92,11 +92,41 @@ export function parseLocations(loc: Iterable<string>, fsc: Iterable<string>, dat
   const out: Record<string, string[]> = {};
   for (const [nlc, { crs, group }] of byNlc) {
     const codes = [nlc];
-    if (group && group !== nlc) codes.push(group);
+    if (group && group !== nlc) {
+      codes.push(group);
+      // A fare group (such as London Terminals) can be searched as a place of its own.
+      out[group] ??= [group, ...(clusters.get(group) ?? [])];
+    }
     for (const c of [...codes]) codes.push(...(clusters.get(c) ?? []));
     out[crs] = [...new Set(codes)];
   }
   return out;
+}
+
+export interface FareGroup {
+  /** The group's own location code, e.g. "1072" for London Terminals. */
+  code: string;
+  /** Its name in the fares feed, e.g. "LONDON TERMINALS". */
+  name: string;
+  /** CRS codes of its stations. */
+  members: string[];
+}
+
+/** Fare groups with two or more stations, from the locations current on `date` (.LOC). */
+export function parseFareGroups(loc: Iterable<string>, date: string): FareGroup[] {
+  const names = new Map<string, string>();
+  const members = new Map<string, string[]>();
+  for (const l of loc) {
+    if (l.slice(0, 2) !== 'RL' || !current(l.slice(9, 17), l.slice(17, 25), date)) continue;
+    const nlc = l.slice(36, 40);
+    names.set(nlc, l.slice(40, 56).trim());
+    const crs = l.slice(56, 59).trim();
+    const group = l.slice(69, 75).trim();
+    if (crs && group && group !== nlc) members.set(group, [...(members.get(group) ?? []), crs]);
+  }
+  return [...members]
+    .filter(([, list]) => list.length > 1)
+    .map(([code, list]) => ({ code, name: names.get(code) || code, members: [...new Set(list)] }));
 }
 
 interface Flow {

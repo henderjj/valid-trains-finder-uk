@@ -75,3 +75,28 @@ describe('planJourneys', () => {
     expect(planJourneys(net, day, 'LGE', 'XXX')).toEqual([]);
   });
 });
+
+describe('planJourneys between groups of stations', () => {
+  it('lists each train once, boarding at the last of the origin stations it calls at', () => {
+    expect(planJourneys(net, day, ['LGE', 'DBY'], ['SHF']).map(describeJourney)).toEqual([
+      'D DBY-SHF',
+      'C DBY-SHF',
+      'B DBY-SHF',
+      'G LGE-SHF',
+      'J DBY-SHF',
+    ]);
+  });
+
+  it('leaves at the first of the destination stations a train reaches', () => {
+    expect(planJourneys(net, day, 'LGE', ['DBY', 'SHF']).map(describeJourney)).toEqual([
+      'A LGE-DBY',
+      'C LGE-DBY',
+      'G LGE-SHF',
+      'H LGE-NOT, I NOT-DBY',
+    ]);
+  });
+
+  it('does not start from a station that is also a destination', () => {
+    expect(planJourneys(net, day, ['LGE', 'DBY'], ['DBY']).every((j) => j.legs[0].calls[0].crs === 'LGE')).toBe(true);
+  });
+});

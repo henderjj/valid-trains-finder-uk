@@ -58,6 +58,8 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
   const list = coming ? back.journeys : journeys;
   const day = coming ? back.date : date;
   const [start, end] = coming ? [to, from] : [from, to];
+  // With a city's stations at either end, each journey says which stations it uses.
+  const grouped = start.members !== undefined || end.members !== undefined;
   const outTicket = fares ? pick(fares.out, picked) : undefined;
   const half = coming && outTicket?.type.ret ? outTicket : undefined;
   const options = !fares ? [] : coming ? (half ? [] : fares.backSingles) : leg === 'O' ? fares.out : fares.back;
@@ -202,6 +204,11 @@ export function Results({ from, to, date, journeys, back, fares, stations }: Pro
                   {clock(j.dep)} → {clock(j.arr)}
                 </span>
                 <span class="duration">{duration(j.arr - j.dep)}</span>
+                {grouped && (
+                  <span class="meta">
+                    {name(j.legs[0].calls[0].crs)} → {name(j.legs[j.legs.length - 1].calls.at(-1)!.crs)}
+                  </span>
+                )}
                 <span class="meta">
                   {changes === 0
                     ? j.legs[0].stops === 0

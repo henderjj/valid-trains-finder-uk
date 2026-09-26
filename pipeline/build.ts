@@ -11,14 +11,14 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { gzipSync } from 'node:zlib';
 import type { FaresMeta } from '../src/lib/fares.ts';
-import type { DataMeta } from '../src/lib/timetable.ts';
+import type { DataMeta, Station } from '../src/lib/timetable.ts';
 import { CifParser, parseChangeTimes, parseStationNames, type CifFile } from './cif.ts';
 import { routeOperators } from '../src/lib/fares.ts';
 import { operatorName, registerOperators } from '../src/lib/operators.ts';
 import { annotations, checkData, summary, type BuildSummary } from './checks.ts';
-import { parseFares, parseLocations, parseOperators, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities } from './fares.ts';
+import { parseFareGroups, parseFares, parseLocations, parseOperators, parseRestrictions, parseRoutes, parseTicketTypes, parseValidities } from './fares.ts';
 import { parsePermittedRoutes, parseRouteing } from './routeing.ts';
-import { addDays, buildDay, buildStations, crsByTiploc, titleCase } from './publish.ts';
+import { addDays, buildDay, buildGroups, buildStations, crsByTiploc, titleCase } from './publish.ts';
 
 const OUT = 'public/data';
 
@@ -55,15 +55,16 @@ function optionalMember(zip: string, ext: string): string[] {
 }
 
 /** Walk-up fares current on `date`, as one file per origin fare location code. */
-async function buildFares(zip: string, date: string): Promise<{ summary: NonNullable<BuildSummary['fares']>; routes: Record<string, string> }> {
+async function buildFares(zip: string, date: string, stations: Station[]): Promise<{ summary: NonNullable<BuildSummary['fares']>; routes: Record<string, string> }> {
   // Operator names first, so route descriptions naming a new operator can be read.
   const operators = parseOperators(optionalMember(zip, 'TOC'), titleCase);
   registerOperators(operators);
   await writeFile(`${OUT}/operators.json`, JSON.stringify(operators));
   const tickets = parseTicketTypes(member(zip, 'TTY'), date, parseValidities(optionalMember(zip, 'TVL'), date));
   const { files, routes, restrictions } = parseFares(member(zip, 'FFL'), tickets, date);
+  const loc = member(zip, 'LOC');
   const meta: FaresMeta = {
-    locations: parseLocations(member(zip, 'LOC'), member(zip, 'FSC'), date),
+    locations: parseLocations(loc, member(zip, 'FSC'), date),
     tickets,
     routes: parseRoutes(member(zip, 'RTE'), routes, date),
   };
@@ -77,6 +78,10 @@ async function buildFares(zip: string, date: string): Promise<{ summary: NonNull
     await writeFile(`${OUT}/fares/${code}.json`, json);
   }
   await writeFile(`${OUT}/fares-meta.json`, JSON.stringify(meta));
+  // Cities' fare groups, offered as "all stations" places.
+  const groups = buildGroups(parseFareGroups(loc, date), stations);
+  await writeFile(`${OUT}/groups.json`, JSON.stringify(groups));
+  console.log(`Station groups: ${groups.map((g) => `${g.name} ${g.crs} (${g.members.join(' ')})`).join(', ')}`);
   await writeFile(`${OUT}/restrictions.json`, JSON.stringify(parseRestrictions(member(zip, 'RST'), restrictions)));
   console.log(
     `Fares: ${Object.keys(tickets).length} ticket types (${Object.values(tickets).filter((t) => t.valid).length} with validity), ${files.size} origin files, ${kb(raw)} raw, ${kb(gz)} gzip; ` +
@@ -170,7 +175,7 @@ async function main() {
   console.log(`Stations sharing a name: ${noted.map((s) => `${s.name} ${s.crs} (${s.note})`).join(', ') || 'none'}`);
 
   const faresZip = 'data/raw/fares.zip';
-  const fares = existsSync(faresZip) ? await buildFares(faresZip, start) : undefined;
+  const fares = existsSync(faresZip) ? await buildFares(faresZip, start, stations) : undefined;
   if (!fares) console.log('No fares feed downloaded; skipping fares');
 
   const routeingZip = 'data/raw/routeing.zip';
