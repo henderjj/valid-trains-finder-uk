@@ -191,7 +191,17 @@ export function parseRestrictions(lines: Iterable<string>, used: Set<string>): R
   const window = (r: Restriction, seq: string, dir: string) => r.windows.find((w) => (w as { seq?: string }).seq === seq && w.dir === dir);
   const train = (r: Restriction, uid: string, dir: string) => r.trains.find((t) => t.uid === uid && t.dir === dir);
 
-  for (const l of lines) {
+  // The feed lists records sorted by type, so date bands (RHD, RTD, RSD) and stations (RSQ)
+  // come before the headers, time windows and trains they belong to. Read the headers first,
+  // then windows and trains, then everything that attaches to them.
+  const all = [...lines];
+  const pass = (l: string) => {
+    const type = l.slice(0, 3);
+    return type === 'RRD' || type === 'RRH' ? 0 : type === 'RTR' || type === 'RSR' ? 1 : 2;
+  };
+  const ordered = [0, 1, 2].flatMap((n) => all.filter((l) => pass(l) === n));
+
+  for (const l of ordered) {
     const type = l.slice(0, 3);
     const cf = l[3];
     if (type === 'RRD') {

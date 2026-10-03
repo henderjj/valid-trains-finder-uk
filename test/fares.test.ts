@@ -44,18 +44,22 @@ const ffl = [
   rec([0, 'RT'], [2, '0292306'], [9, 'SVR'], [12, '00002870'], [20, '2O']),
   rec([0, 'RT'], [2, '0292306'], [9, 'CDS'], [12, '00001520'], [20, 'B3']),
 ];
+// In the feed's own order: records are sorted by type, so date bands come before the
+// headers and time windows they belong to.
 const rst = [
+  rec([0, 'RHDC2O'], [6, '01020325YYYYYNN']),
+  rec([0, 'RHDC2O'], [6, '03301222YYYYYNN']),
   rec([0, 'RRDC'], [4, '05072026'], [12, '31102026']),
   rec([0, 'RRDF'], [4, '01112026'], [12, OPEN]),
   rec([0, 'RRHC2O'], [6, 'SMR OFF PEAK'], [36, 'VALID ON ANY TRAIN AFTER 0900 M-F'], [86, 'ANY TRAIN'], [136, 'NNY']),
-  rec([0, 'RHDC2O'], [6, '01020325YYYYYNN']),
-  rec([0, 'RHDC2O'], [6, '03301222YYYYYNN']),
-  rec([0, 'RTRC2O'], [6, '0001O04300900D   TAN']),
   rec([0, 'RRHCB3'], [6, 'OFF-PEAK'], [36, 'VALID AFTER 0859 MON-FRI'], [136, 'PPY']),
-  rec([0, 'RTRCB3'], [6, '0002O16001601DPADTAN']),
-  rec([0, 'RTTCB3'], [6, '0002OGW']),
-  rec([0, 'RSRCB3'], [6, 'C12345ONN']),
   rec([0, 'RRHCXX'], [6, 'UNUSED']),
+  rec([0, 'RSRCB3'], [6, 'C12345ONN']),
+  rec([0, 'RTDCB3'], [6, '0003O01011231YYYYNNN']),
+  rec([0, 'RTRC2O'], [6, '0001O04300900D   TAN']),
+  rec([0, 'RTRCB3'], [6, '0002O16001601DPADTAN']),
+  rec([0, 'RTRCB3'], [6, '0003O04300858D   TAN']),
+  rec([0, 'RTTCB3'], [6, '0002OGW']),
 ];
 
 const tickets = parseTicketTypes(tty, DATE);
@@ -133,6 +137,16 @@ describe('restrictions', () => {
 
   it('does not apply on days outside the restriction dates', () => {
     expect(check(8 * 60 + 12, '2026-10-03').valid).toBe(true); // Saturday
+  });
+
+  it('does not apply on Sundays when the restriction is Monday to Friday', () => {
+    expect(check(8 * 60 + 12, '2026-10-04').valid).toBe(true); // Sunday
+  });
+
+  it('applies a time window only on the days its date bands give', () => {
+    expect(sets[0].restrictions['B3'].windows[1].dates).toEqual([{ from: '0101', to: '1231', days: 'YYYYNNN' }]);
+    expect(check(8 * 60, DATE, 'B3').valid).toBe(false); // Monday
+    expect(check(8 * 60, '2026-10-09', 'B3').valid).toBe(true); // Friday
   });
 
   it('only applies location windows at that station', () => {

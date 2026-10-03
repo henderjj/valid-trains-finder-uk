@@ -125,9 +125,9 @@ A journey is valid for a ticket only if it passes all of these checks, in this o
    - Reason shown: "this ticket is LNER only (the 09:05 is Lumo)" or "this ticket is not valid on …".
 2. **Permitted route** (from the National Routeing Guide), described in the next section.
    - Reasons shown: "changing at X and Y is not a permitted route for this ticket", or "doesn't go the way the ticket's route (VIA SHEFFIELD) requires" when the journey misses a place or operator the ticket's route names.
-3. **Time restrictions** (the restriction code on the fare, for example Off-Peak codes). A restriction applies only on the dates and days of the week it covers.
+3. **Time restrictions** (the restriction code on the fare, for example Off-Peak codes). A restriction applies only on the dates and days of the week it covers. Most Off-Peak and Super Off-Peak restrictions cover Monday to Friday only, outside bank holidays, so at weekends these tickets are usually valid on every train.
    - **Listed trains.** A restriction can list specific trains as not valid (reason: "the 07:12 from X is excluded for this ticket"). Or it can list trains as valid whatever the time, in which case those trains skip the time checks.
-   - **Time windows.** A window bans departing from, arriving at, or passing through a station between two times. Where no station is given, departures are checked at the origin and arrivals at the destination. A window may apply only to certain operators or dates.
+   - **Time windows.** A window bans departing from, arriving at, or passing through a station between two times. Where no station is given, departures are checked at the origin and arrivals at the destination. A window may apply only to certain operators, dates or days of the week (for example an evening peak from London on Monday to Thursday only).
      - Reason shown: "departs Long Eaton at 07:40 (restricted 00:00–09:29)".
    - Every train in a journey with changes is checked, not only the first.
    - The outward and return directions use their own rules.
