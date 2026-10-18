@@ -14,6 +14,10 @@ The app is a Progressive Web App, so it can be installed from the browser to a p
 
 After the first visit, the app itself works offline. Data files (timetables, fares and routeing) are cached as they are used, so a route and day you have already searched also works offline.
 
+## Visitor analytics
+
+The app uses Cloudflare Web Analytics to count visits. It loads Cloudflare's small beacon script on each page view, which reports page views and page load performance to Cloudflare without cookies or any data stored in the browser, and without the stations, dates or tickets you search for. When the app is used offline the beacon can't load, and the app works as normal.
+
 ## Searching
 
 ### Stations
