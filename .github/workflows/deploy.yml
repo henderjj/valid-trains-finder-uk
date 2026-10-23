@@ -41,7 +41,9 @@ jobs:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
       - name: Build timetable, fares and routeing data
-        run: npm run data:build -- "" "${{ inputs.days || '84' }}"
+        run: npm run data:build -- "" "$DAYS"
+        env:
+          DAYS: ${{ inputs.days || '84' }}
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
         with:
