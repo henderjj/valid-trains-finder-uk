@@ -9,6 +9,9 @@ on:
         description: Number of days to build
         default: '7'
 
+permissions:
+  contents: read
+
 jobs:
   measure:
     runs-on: ubuntu-latest
@@ -25,4 +28,6 @@ jobs:
           NRDP_USERNAME: ${{ secrets.NRDP_USERNAME }}
           NRDP_PASSWORD: ${{ secrets.NRDP_PASSWORD }}
       - name: Build per-day files and report sizes
-        run: npm run data:build -- "$(date -u +%F)" "${{ inputs.days }}" | tee -a "$GITHUB_STEP_SUMMARY"
+        run: npm run data:build -- "$(date -u +%F)" "$DAYS" | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          DAYS: ${{ inputs.days }}
